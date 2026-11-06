@@ -476,6 +476,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, look())
         if path == '/favicon.svg':
             return self.send_bytes(favicon(), 'image/svg+xml')
+        if path == '/api/time':  # every screen sets its clock by this
+            return self.send_json(200, {'t': int(time.time() * 1000)})
         if path == '/api/crew':
             return self.send_json(200, crew_list())
         if path == '/api/me':  # who is logged in; with nobody set up yet, the page shows the first-run screen

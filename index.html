@@ -396,9 +396,23 @@ function toast(msg) {
 /* ---------- state */
 const SRC = uid();
 // Every device sets its clock by the server's, so a speaker iPad and the caller's laptop agree even if their own clocks don't.
-// Each update carries the server time; network delay only ever makes it look early, so the largest offset seen is the truest.
-let skew = 0, skewSeen = false;
+// It asks the server the time and times the round trip: the answer is about half a trip old. The quickest of the last few
+// answers is the truest, so a slow or laggy connection can't throw the clock off. A big jump on a quick answer means this
+// device's own clock was changed, so it starts afresh.
+let skew = 0, samples = [];
 const nowMs = () => Date.now() + skew;
+const bestSkew = list => list.reduce((a, b) => b.rtt < a.rtt ? b : a).off;
+async function syncClock(n = 3) {
+  for (let i = 0; i < n; i++) {
+    try {
+      const t0 = Date.now(), r = await fetch('/api/time', {cache:'no-store'}), t1 = Date.now(), {t} = await r.json();
+      const x = {rtt:t1 - t0, off:t - (t0 + t1) / 2};
+      if (x.rtt < 500 && samples.length && Math.abs(x.off - skew) > 2000) samples = [];
+      samples = [...samples.slice(-7), x]; skew = bestSkew(samples);
+    } catch {}
+  }
+}
+syncClock(); setInterval(() => syncClock(1), 20e3);
 let R = {}, me = null, isAdmin = false, show = null, sid = null, es = null, viewers = 0, online = false, dirty = false, pushT, lastJs = '';
 let simple = store.get('simple') === true;
 const canEdit = () => !!me && !R.token;
@@ -455,13 +469,12 @@ async function openShow() {
 }
 function connect() {
   const src = es = new EventSource(R.token ? `/api/events/v/${R.token}` : `/api/events/${R.id}`);
-  src.onopen = () => { online = true; skewSeen = false; syncChip(); if (dirty) push(); };
+  src.onopen = () => { online = true; syncClock(); syncChip(); if (dirty) push(); };
   // The browser retries a dropped stream itself, but gives up for good on an error reply (a restart, too many viewers)
   src.onerror = () => { online = false; syncChip(); if (src.readyState === 2) setTimeout(() => es === src && connect(), 3000); };
   src.onmessage = e => {
     const m = JSON.parse(e.data), js = JSON.stringify(m.show), was = lastJs && JSON.parse(lastJs).live;
     viewers = m.viewers;
-    if (m.t) { const s = m.t - Date.now(); skew = skewSeen ? Math.max(skew, s) : s; skewSeen = true; }
     if (js === lastJs || m.show.src === SRC) { lastJs = js; return tick(); }
     // With unsent edits here, still follow a Complete from the phone remote, unless this device has moved the show itself
     if (dirty && JSON.stringify(show.live) !== JSON.stringify(was)) { lastJs = js; return tick(); }
@@ -1257,6 +1270,7 @@ go();
 if (location.search.includes('selftest')) {
   const ok = (c, m) => { if (!c) throw Error('selftest: ' + m); };
   ok(parseDur('5') === 300 && parseDur('5:30') === 330 && parseDur('1:00:05') === 3605 && parseDur('abc') === null, 'parseDur');
+  ok(bestSkew([{rtt:30000, off:-25000}, {rtt:80, off:1200}, {rtt:9000, off:-7000}]) === 1200, 'the quickest answer sets the clock');
   ok(fmtDur(330) === '5:30' && fmtDur(3605) === '1:00:05' && fmtDur(-75) === '1:15', 'fmtDur');
   const keep = show, t0 = new Date('2026-11-04T19:00').getTime();
   show = {date:'2026-11-04', start:'19:00', items:[{id:'h', type:'header'}, {id:'a', dur:600}, {id:'b', dur:300}], live:{id:'a', at:t0 + 120e3, log:[]}};

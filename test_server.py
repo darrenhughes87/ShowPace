@@ -119,6 +119,8 @@ assert call('/api/login', 'POST', {'user': 'sam', 'pass': 'correct horse battery
 assert call('/api/crew/nope', 'POST', {'pass': 'x'}, ip='9.9.9.9')[0] == 403, 'crew typos are counted apart from logins'
 assert call('/api/login', 'POST', {'user': 'sam', 'pass': 'x'}, ip='1.1.1.1, 9.9.9.9')[0] == 429, 'the address Caddy adds is the one counted'
 assert call('/server.py', 'HEAD')[0] == 405
+import time
+assert abs(call('/api/time')[2]['t'] - time.time() * 1000) < 2000, 'the server tells screens the time'
 assert server.length('0:10') == 600 and server.length('5:30') == 330 and server.length('10') == 600, 'a CSV 0:10 is ten minutes, as in Excel'
 open(os.path.join(server.DATA, 'sessions.json'), 'w').close()
 assert call('/api/me', cookie=cookie)[0] == 401, 'an empty sessions file logs people out instead of breaking'
