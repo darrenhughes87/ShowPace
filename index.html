@@ -984,12 +984,13 @@ function viewRemote() {
 
 // Redraws keep your place: the page and every scrolling panel stay where you left them.
 const SCROLLERS = ['.grid-wrap', '.c-list', '.c-detail', '.c-timer'];
-// Centre the rundown on the live segment when Call opens and each time the show moves on; otherwise leave your scroll alone.
+// Centre the running order on the live segment when it opens and each time the show moves on; otherwise leave your scroll alone.
+// Call's list and the Edit / crew Running order grid both do it, but never while someone is typing in the grid.
 let followed = null;
 function followLive() {
-  const list = $('.c-list'), row = $('.r-row.is-live') || $('.r-row.is-next');
+  const list = $('.c-list') || $('.grid-wrap'), row = $('.r-row.is-live') || $('.r-row.is-next') || $('#grid tr.is-live');
   const key = R.view + ':' + show.id + ':' + show.live.id;
-  if (!list || !row || key === followed) return;
+  if (!list || !row || key === followed || document.activeElement?.closest('#grid')) return;
   followed = key;
   const l = list.getBoundingClientRect(), r = row.getBoundingClientRect();
   list.scrollTop += r.top - l.top - (list.clientHeight - r.height) / 2;  // only the list scrolls, never the page
