@@ -210,6 +210,7 @@ a.crew-card:hover{border-color:var(--brand3)}
 .msg-pre button{min-height:44px}
 .msg-dlg input{background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:10px 11px;font-size:16px}
 .msg-acts{display:flex;gap:8px;justify-content:flex-end}
+.msg-now{margin:0;height:1.6em;line-height:1.6em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .msg-acts .primary{min-width:90px}
 .msg-btn{width:100%;min-height:44px;margin-top:10px}
 @keyframes msgflash{50%{opacity:.1}}
@@ -617,6 +618,13 @@ function msgChip() {
   const x = canEdit() || remoteKey() ? '<button class="msg-x" data-a="msgClear" title="Take the message off the clock" aria-label="Clear the message">✕</button>' : '';
   return ` · <span class="msg-on${msgFresh() ? ' flash' : ''}">${esc(m.text)}</span>${x}`;
 }
+// The open pop-up follows what's on the clock, even when the phone remote or a Complete changes it. Same buttons, same places.
+function msgSync() {
+  const d = $('#msg-dlg'), m = show?.live.msg;
+  if (!d) return;
+  d.querySelector('[data-msg-now]').innerHTML = m ? `On the clock now: <span class="msg-on">${esc(m.text)}</span>` : 'Nothing on the clock';
+  d.querySelector('[data-a="msgClear"]').disabled = d.querySelector('[data-a="msgFlash"]').disabled = !m;
+}
 function timerCard(withTech) {
   const st = state(), i = liveIdx();
   // Same slots in every state, so the card is always the same height
@@ -996,7 +1004,7 @@ function render() {
     SCROLLERS.forEach((s, n) => { const el = $(s); if (el && kept[n]) [el.scrollTop, el.scrollLeft] = kept[n]; });
     scrollTo(0, y);
   }
-  followLive();
+  followLive(); msgSync();
   tick(); wake();
 }
 
@@ -1148,26 +1156,26 @@ const ACT = {
     show.live.hold = {at:nowMs(), dur:Math.round(m * 60)}; holdMins = ''; save(); render();
   },
   holdOff() { show.live.hold = null; save(); render(); },
-  message() {  // a pop-up over everything, so nothing on the screen moves
+  message() {  // a pop-up over everything, so nothing on the screen moves. It stays open, to change, flash or clear quickly.
     $('#msg-dlg')?.remove();
     const m = show.live.msg;
     document.body.insertAdjacentHTML('beforeend', `<dialog id="msg-dlg" class="msg-dlg"><form id="msg-form">
-      <div class="lab">Message the speaker</div>
+      <div class="lab">Message the speaker</div><p class="msg-now" data-msg-now></p>
       <div class="msg-pre">${['Wrap up', 'Speak up', 'Slow down', 'Questions now'].map(p => `<button type="button" data-a="msgPick" data-p="${p}">${p}</button>`).join('')}</div>
       <input id="msg-text" maxlength="60" placeholder="Or type your own" autocomplete="off" value="${esc(m?.text || '')}" aria-label="Message">
-      <div class="msg-acts"><button type="button" data-a="msgClose">Close</button>${m ? '<button type="button" data-a="msgClear">Clear</button><button type="button" data-a="msgFlash">Flash</button>' : ''}<button class="primary">Send</button></div>
+      <div class="msg-acts"><button type="button" data-a="msgClose">Close</button><button type="button" data-a="msgClear">Clear</button><button type="button" data-a="msgFlash">Flash</button><button class="primary">Send</button></div>
     </form></dialog>`);
     $('#msg-form').onsubmit = e => {
       e.preventDefault();
       const text = $('#msg-text').value.trim();
       if (!text) return toast('Pick or type a message first');
-      show.live.msg = {text, at:nowMs()}; ACT.msgClose(); save(); render();
+      show.live.msg = {text, at:nowMs()}; save(); render();
     };
-    $('#msg-dlg').showModal();
+    msgSync(); $('#msg-dlg').showModal();
   },
   msgPick(b) { $('#msg-text').value = b.dataset.p; $('#msg-text').focus(); },  // picks it; Send puts it up
-  msgFlash() { if (show.live.msg) { show.live.msg.at = nowMs(); ACT.msgClose(); save(); render(); } },
-  msgClear() { show.live.msg = null; ACT.msgClose(); save(); render(); },
+  msgFlash() { if (show.live.msg) { show.live.msg.at = nowMs(); save(); render(); } },
+  msgClear() { show.live.msg = null; save(); render(); },
   msgClose() { $('#msg-dlg')?.close(); $('#msg-dlg')?.remove(); },
   ttGo() {
     if (ttTarget == null || Math.abs(ttTarget - curEnd()) < 1000) return toast('Set a new end time or minutes saved first');
