@@ -1,0 +1,9 @@
+Cue,Start,End,Duration (mins),Segment,Type,Who,Audio,Lighting,Video,Notes
+Q1,09:00,10:00,,Doors and registration,Break,,Walk-in music,House to 50%,Holding slide,Example rows: delete these and add your own
+,,,,Morning session,Section,,,,,A Type of Section makes a heading row
+Q2,10:00,,10,Welcome and housekeeping,Talk,"Sam Jones, Riverside Council",LEC,Lectern special,Event logo,Duration in minutes
+Q3,10:10,,30,Panel: the big question,Panel,Host (TBC),HH1,Stage wash,Panel names slide,
+,,,,,,"Alex Reid, Northfield Labs",HH2,,,A row with no Segment adds its people and mics to the row above
+Q4,10:40,10:55,,Coffee break,Break,,BGM,,Sponsor loop,No duration? Start and End work it out
+,10:55,11:30,,Networking,Free,,BGM,,Sponsor loop,Free time: no countdown. Its End is when the next cue starts
+Q5,11:30,,20,Keynote,Talk,"Alex Reid, Northfield Labs",LEC,Keynote state,Speaker deck,

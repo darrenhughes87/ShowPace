@@ -1,0 +1,31 @@
+# ShowPace on a server, with free HTTPS from Caddy.
+# Your web address goes in the .env file (install.sh writes it for you): DOMAIN=shows.example.com
+services:
+  showpace:
+    build: .
+    restart: unless-stopped
+    environment:
+      SHOWPACE_SECURE: "1"
+      SHOWPACE_PROXY: "1"
+    volumes:
+      - showpace-data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Put your web address in the .env file, like DOMAIN=shows.example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - showpace
+
+volumes:
+  showpace-data:
+  caddy-data:
+  caddy-config:

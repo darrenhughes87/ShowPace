@@ -1,0 +1,5 @@
+# Shows, logins and settings stay on your computer or server, never in git
+data/
+.env
+__pycache__/
+.DS_Store

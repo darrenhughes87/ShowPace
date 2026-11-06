@@ -1,0 +1,6 @@
+data
+.env
+.git
+*.md
+test_server.py
+install.sh

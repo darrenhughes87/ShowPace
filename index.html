@@ -1,0 +1,1286 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101211">
+<meta name="robots" content="noindex, nofollow">
+<!-- Share, then Add to Home Screen, opens ShowPace with no browser bars: best for a stage iPad -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ShowPace">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>ShowPace</title>
+<style>
+/* Layout: a slim top bar, then one working surface per view.
+   Call: timer column | rundown | tech detail. Edit: one grid. Crew: Now beside Next/Then. Timer: full screen. */
+:root{
+  /* Green while it runs, orange near the end, red when it's over */
+  --bg:#101211; --panel:#171a19; --panel2:#1f2321; --line:#2a2f2d; --line2:#38403c;
+  --fg:#edf2ef; --muted:#95a09a; --dim:#7f8a84;
+  --brand:#1F8F4E; --brand2:#3A9C63; --brand3:#62B183;
+  --ok:#2fa35f; --warn:#F28C28; --warn-bg:#7a3d0c; --warn-bg2:#8f4a12; --bad:#E5483B; --bad-bg:#5c1f1a; --bad-bg2:#74281f;
+  --display:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  /* Worked out from the main colour, so a new colour on the Admin page carries through. --on-brand flips to dark text on a pale colour. */
+  --on-brand:#fff;
+  --tint:color-mix(in srgb,var(--brand) 22%,var(--bg)); --tint2:color-mix(in srgb,var(--brand) 40%,var(--bg));
+  --tint-fg:color-mix(in srgb,var(--brand3) 35%,#fff);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.4 var(--body);-webkit-font-smoothing:antialiased;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+button,input,textarea,select{font:inherit;color:inherit}
+button,.btn{cursor:pointer;background:var(--panel2);border:1px solid var(--line2);border-radius:7px;padding:7px 12px;white-space:nowrap;text-decoration:none;display:inline-block}
+button:hover,.btn:hover{border-color:var(--brand3)}
+.primary,.go{background:var(--brand);border-color:var(--brand);color:var(--on-brand);font-weight:700}
+.primary:hover,.go:hover{background:var(--brand2)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--brand3);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.muted{color:var(--muted)}
+.lab{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.chip{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;background:var(--panel2);color:var(--fg);white-space:nowrap}
+.chip.over{background:var(--bad-bg);color:#ffd5cf}.chip.under{background:#1d3f26;color:#cdf0d6}
+.late.soft{background:none;color:#ff8f86;padding:0 0 0 2px}
+.late{display:inline-block;text-transform:none;letter-spacing:0;white-space:nowrap;background:var(--bad);color:#fff;border-radius:4px;padding:0 5px;font-size:11px;font-weight:700;margin-left:3px;vertical-align:1px}
+.r-row.is-live .late{background:#fff;color:var(--bad)}
+
+/* Segment types: filled chips, never side stripes */
+.k-talk{background:#1f4a33;color:#cdf0d6}.k-panel{background:#24405e;color:#d5e7fb}.k-break{background:#5a3a14;color:#ffe1bf}
+.k-free{background:#1d4246;color:#cdeff1}.k-video{background:#5a2420;color:#ffd3cc}.k-music{background:#5a2643;color:#fbd6e9}.k-other{background:#3a363c;color:#e3dee5}
+
+/* Top bar */
+/* One row on desktop: brand · show · views ··· detail · status · crew. Under 1000px the views and detail drop to a second row. */
+.top{position:sticky;top:env(safe-area-inset-top);z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
+  padding-block:8px;background:color-mix(in srgb,var(--bg) 96%,transparent);border-bottom:1px solid var(--line)}
+.top .right{display:flex;align-items:center;gap:8px;margin-left:auto}
+@media (max-width:999px){.top .seg{order:3}.top .right{order:4}.top .tabs{order:5;flex:1 1 100%}.top .tabs a{flex:1;text-align:center}}
+/* Phones: the sync label becomes a coloured dot (its words are in the tooltip), so the header needs a row less */
+@media (max-width:560px){.top .sync{width:12px;height:12px;padding:0;font-size:0;background:var(--muted)}.top .sync.ok{background:var(--ok)}.top .sync.bad{background:var(--bad)}}
+.crew-menu{position:relative}
+.crew-menu summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;min-width:128px}
+.crew-menu summary::-webkit-details-marker{display:none}
+.crew-menu summary.on{background:#1d3f26;border-color:#2e6a3d;color:#cdf0d6;font-weight:700}
+.crew-menu .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:8;width:280px;display:grid;gap:6px;padding:12px;
+  background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.crew-menu .menu p{margin:0 0 4px;color:var(--muted);font-size:12px;line-height:1.4}
+.crew-menu .menu button{text-align:left}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top);background:var(--bg);z-index:10}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo span{font:700 18px/1 var(--body);color:var(--brand3);letter-spacing:-.01em}
+.show-name{display:grid;min-width:0;flex:1 1 110px}
+.show-name b{font:400 17px/1.2 var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.show-name small{color:var(--muted);font-size:12px}
+.tabs,.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+.tabs a,.seg button{border:0;background:none;border-radius:6px;padding:6px 12px;color:var(--muted);text-decoration:none;font-weight:700;font-size:13px}
+.tabs a:hover,.seg button:hover{color:var(--fg)}
+.tabs a[aria-current="page"],.seg button[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
+.sync{font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;background:var(--panel2);color:var(--muted);width:76px;text-align:center;white-space:nowrap}
+.sync.ok{background:#1d3f26;color:#cdf0d6}.sync.bad{background:var(--bad-bg);color:#ffd5cf}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:20;
+  background:var(--fg);color:var(--bg);font-weight:700;border-radius:8px;padding:10px 16px}
+
+/* Login */
+.login{max-width:360px;margin:12vh auto 0;display:grid;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px}
+.login h1{font:700 30px/1 var(--display);margin:4px 0 0;color:var(--brand3);letter-spacing:-.02em}
+.login p{margin:0}
+.login label,.form label{display:grid;gap:5px;font-size:12px;color:var(--muted)}
+input.f,.login input,.form input{background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:9px 11px;font-size:15px}
+.err{color:#ffb4ab}
+
+/* Caller remote: the QR card that stays up, and the phone remote */
+.modal{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.72)}
+.modal-card{width:min(420px,100%);display:grid;gap:12px;justify-items:center;text-align:center;background:var(--panel);border:1px solid var(--line2);border-radius:16px;padding:22px}
+.modal-card h2{font:400 24px/1.2 var(--display);margin:0}
+.modal-card p{margin:0;color:var(--muted);font-size:13px}
+.qr{width:min(300px,70vw);background:#fff;border-radius:10px;padding:10px}
+.qr svg{display:block;width:100%;height:auto}
+.modal-card code{font-size:12px;word-break:break-all;user-select:all;color:var(--fg)}
+.modal-card .row{display:flex;gap:8px}
+.remote{display:grid;gap:12px;padding-block:14px calc(20px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto}
+.remote .r-next{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}  /* one line, so the controls below never move */
+.remote .r-next .lab{margin-bottom:4px;height:18px;line-height:18px}
+@media (max-width:899px){.remote{padding-bottom:calc(110px + env(safe-area-inset-bottom))}}  /* room for the controls fixed at the bottom */
+.remote form{display:grid;gap:10px}
+
+/* Crew page */
+.crew-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;text-decoration:none}
+a.crew-card:hover{border-color:var(--brand3)}
+.crew-card .d{font-size:13px;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+.crew-card h2{font:400 22px/1.25 var(--display);margin:4px 0 0}
+.crew-card .btn{padding:12px 22px;font-size:16px}
+.crew-pass{display:flex;gap:8px;grid-column:1/-1}
+.crew-pass input{flex:1;min-width:0}
+.crew-card .err{grid-column:1/-1;margin:0}
+
+/* Shows list */
+.shows{max-width:1100px;margin:0 auto;padding-block:22px 60px}
+.shows-head{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-bottom:16px}
+.shows-head h1{font:400 32px/1 var(--display);margin:0 auto 0 0}
+.form{display:flex;flex-wrap:wrap;gap:12px;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.form .grow{flex:1;min-width:220px}
+.form .check{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--fg);min-height:40px}
+.form input[type=color]{width:72px;height:40px;padding:3px;cursor:pointer}
+.form .full{flex-basis:100%;margin:0}
+.admin h2.lab{margin:26px 0 10px}
+.show-row.user-row{grid-template-columns:minmax(0,1fr) auto}
+.list{display:grid;gap:8px}
+.show-row{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:6px 16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.show-row.today{background:var(--tint);border-color:var(--tint2)}
+.show-row.arch{opacity:.55}
+.show-row .d{font-weight:700;font-variant-numeric:tabular-nums}
+.show-row .d small{display:block;color:var(--muted);font-weight:400}
+.show-row h2{font:400 19px/1.25 var(--display);margin:0}
+.show-row h2 a{text-decoration:none}
+.show-row .meta2{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.show-row .acts{display:flex;flex-wrap:wrap;gap:6px;justify-content:end}
+.empty{background:var(--panel);border:1px dashed var(--line2);border-radius:12px;padding:28px;text-align:center;color:var(--muted)}
+@media (max-width:700px){.show-row{grid-template-columns:1fr}.show-row .acts{justify-content:start}}
+
+/* Editor grid */
+.edit{padding-block:14px 60px}
+.meta{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-bottom:12px}
+.meta label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.meta input{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+.meta .m-title{font:400 22px/1.2 var(--display);flex:1;min-width:min(420px,100%);background:transparent;border-color:transparent;padding-left:0}
+.meta .m-title:hover,.meta .m-title:focus{border-color:var(--line2);padding-left:9px}
+.sum{color:var(--muted);font-variant-numeric:tabular-nums;margin-left:auto}
+.sum b{color:var(--fg)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tools .sp{flex:1}
+.grid-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:calc(100vh - 210px)}
+.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+.grid th{position:sticky;top:0;z-index:2;background:var(--panel2);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:9px 8px;border-bottom:1px solid var(--line2);white-space:nowrap}
+.grid td{border-bottom:1px solid var(--line);padding:3px;vertical-align:top;background:var(--bg)}
+.grid tr:nth-child(even) td{background:color-mix(in srgb,var(--bg) 94%,#fff)}
+.grid td.t{padding:8px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--brand3);white-space:nowrap}
+/* The fixed Start after a Free: an input whose text sits exactly where the plain times do (3px cell + 1px border + 4px padding = 8px) */
+.grid td.t:has(input){padding:3px}
+.grid td.free-dur{padding:9px 10px}  /* lines up with the duration boxes: 3px cell + 1px border + 5px/6px padding */
+.grid td.t input{padding:4px;width:auto;min-height:0;line-height:1.35}
+.grid td.t input::-webkit-calendar-picker-indicator{opacity:.5;margin-left:4px;padding:0}
+.grid input,.grid textarea{width:100%;background:transparent;border:1px solid transparent;border-radius:5px;padding:5px 6px;resize:none;field-sizing:content;min-height:30px;line-height:1.35}
+.grid input:hover,.grid textarea:hover{border-color:var(--line2)}
+.grid input:focus,.grid textarea:focus{border-color:var(--brand3);background:var(--panel);outline:0}
+.grid [readonly]{cursor:default}
+.grid [readonly]:hover{border-color:transparent}
+.seg-cell{display:flex;gap:6px;align-items:start}
+.seg-cell textarea{font-weight:700}
+.grid select.kind{width:auto;min-width:64px;flex:none;min-height:24px;margin-top:3px;padding:2px 6px;border-radius:999px;font-size:11px;font-weight:700;appearance:none;text-align:center;border:0}
+.k-none{background:var(--panel2);color:var(--dim)}
+.c-cue{width:56px}.c-start{width:96px}.c-dur{width:76px}.c-title{min-width:260px}.c-who{min-width:150px}
+.c-audio,.c-lx,.c-vid,.c-notes{min-width:170px}
+.grid td.act{white-space:nowrap;padding:4px}
+.grid td.act button{padding:3px 7px;background:none;border-color:transparent;color:var(--dim)}
+.grid td.act button:hover{color:var(--fg);border-color:var(--line2)}
+.grid tr.hdr td{background:var(--tint)!important;border-bottom-color:var(--tint2)}
+.grid tr.hdr input{font:400 16px/1.2 var(--display);color:var(--tint-fg);width:auto;min-width:min(420px,70vw)}
+.hdr-cell{display:flex;align-items:center;gap:12px;padding-left:4px}
+.hsum{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.grid tr.is-live td{background:color-mix(in srgb,var(--brand) 45%,var(--bg))!important}
+.grid tr.is-done td{opacity:.45}
+
+/* Call (controller) */
+.call{display:grid;gap:14px;padding-block:14px 110px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.call{grid-template-columns:360px minmax(0,1fr);padding-bottom:20px;height:calc(100vh - 58px)}}
+@media (min-width:1280px){.call{grid-template-columns:380px minmax(0,1fr) 320px}}
+@media (min-width:900px) and (max-width:1279px){.call:not(.simple){grid-template-rows:minmax(0,3fr) minmax(0,2fr)}.call:not(.simple) .c-timer{grid-row:1/3}}  /* iPad landscape: Now and Next sit under the running order */
+.call>div{min-width:0}
+@media (min-width:900px){.c-list,.c-detail{overflow:auto}.c-timer{overflow:auto}}
+.call.simple{grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.call.simple{grid-template-columns:420px minmax(0,1fr)}}
+.timer{--h2:22px;position:relative;overflow:hidden;border-radius:14px;padding:18px;border:1px solid transparent;color:var(--on-brand);background:linear-gradient(118deg,var(--brand) 0 70%,var(--brand2) 70%)}
+.t-over .timer.is-live{background:linear-gradient(118deg,var(--bad-bg) 0 70%,var(--bad-bg2) 70%)}
+.timer.idle{background:var(--panel);border:1px solid var(--line);color:var(--fg)}
+.timer .lab{color:inherit;opacity:.75}
+.t-over .timer.is-live{color:#fff}
+.timer.idle .lab{color:var(--muted)}
+/* Fixed slots so the card never changes height: three lines of title, one of who, one countdown height */
+/* Title and who sit together at the top; the room kept for a three-line title falls below them, so the card's height never changes */
+.timer .head{height:calc(var(--h2) * 3.6 + 28px)}
+.timer h2{font:400 var(--h2)/1.2 var(--display);margin:8px 0 2px;text-wrap:balance;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.timer .who{margin:0;opacity:.8;font-size:13px;height:1.4em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.count{font:700 clamp(64px,9vw,104px)/1 var(--body);font-variant-numeric:tabular-nums;letter-spacing:-.03em;margin:16px 0 4px;height:clamp(64px,9vw,104px);display:flex;align-items:center}
+.t-warn .count{color:#ffc27d}
+.t-warn .timer.is-live{background:linear-gradient(118deg,var(--warn-bg) 0 70%,var(--warn-bg2) 70%);color:#fff}.t-warn .timer.is-live .count{color:#fff}
+.count.long{font-size:clamp(44px,5.6vw,72px)}  /* an hour or more: h:mm:ss must still fit */
+.tv .count.long{font-size:min(24vh,17vw)}
+.timer .sub{margin:0 0 12px;opacity:.85;font-size:13px;font-variant-numeric:tabular-nums}
+.prog{height:8px;border-radius:4px;background:rgba(0,0,0,.32);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:#7fd598;border-radius:4px}
+.t-warn .prog i{background:var(--warn)}.t-over .prog i{background:#ff8a7f}
+.controls{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;margin-top:10px}
+.controls .go{min-height:48px;font-size:18px}
+.controls .wide{grid-column:1/-1}
+.tt,.hold{display:grid;gap:8px;margin-top:10px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.tt-head{display:flex;align-items:center;gap:8px;height:30px}
+.tt-head button{padding:3px 10px;font-size:12px}
+.tt-head .lab{margin-right:auto}
+.tt-head b{font-size:13px;color:var(--fg);font-variant-numeric:tabular-nums}
+/* One line: estimated end, new end, minutes saved, go */
+.tt-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.1fr) minmax(0,.8fr) auto;gap:8px;align-items:end}
+.tt-grid label{display:grid;gap:4px;font-size:11px;color:var(--muted);white-space:nowrap}
+.tt-grid b{font-size:17px;padding:5px 0;font-variant-numeric:tabular-nums}
+.tt-grid input{width:100%;min-width:0;background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:5px 7px;font-size:16px;font-variant-numeric:tabular-nums}
+.tt-grid input::-webkit-calendar-picker-indicator{display:none}
+.tt-grid .primary{min-height:34px;padding:6px 12px}
+/* Over time: same size, greyed out, a note on the title line. Nothing on the screen moves. */
+.tt-msg{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tt:not(.is-over) .tt-msg,.tt.is-over .tt-head b,.tt.is-over .tt-head button{display:none}
+.tt-head.idle b,.tt-head.idle button{visibility:hidden}
+.tt.is-over .tt-grid{opacity:.4}
+.hold{grid-template-columns:repeat(4,minmax(0,1fr))}
+.hold .lab{grid-column:1/-1;line-height:22px}
+.hold button{min-height:34px;padding:6px 8px}
+.hold [data-a="holdOff"]{grid-column:4;grid-row:2}  /* phone: 5m 10m 20m Stop, then minutes and play */
+.hold input{grid-column:span 2;min-width:0;background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:5px 7px;font-size:16px}
+.hold .primary{grid-column:span 2}
+.hold .sel{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}  /* the picked time, waiting for play */
+/* Call on a laptop or iPad: the whole column fits the screen with no scrolling. One-line hold row, a two-line title,
+   and a countdown sized by the screen's height as well as its width. */
+@media (min-width:900px){
+  .hold{grid-template-columns:auto repeat(3,minmax(0,1fr)) minmax(0,1.2fr) minmax(0,.8fr) auto;align-items:center;gap:6px}
+  .hold .lab,.hold input,.hold .primary{grid-column:auto}.hold [data-a="holdOff"]{grid-column:auto;grid-row:auto}
+  .hold .lab{margin-right:4px}.hold button{padding:6px}
+  .call .timer .head{height:calc(var(--h2) * 2.4 + 28px)}.call .timer h2{-webkit-line-clamp:2}
+  .call .timer{padding:14px 18px}
+  .call .count{font-size:clamp(56px,min(9vw,10vh),104px);height:clamp(56px,min(9vw,10vh),104px);margin:10px 0 4px}
+  .call .count.long{font-size:clamp(40px,min(5.6vw,7vh),72px)}
+}
+@media (min-width:900px) and (max-height:760px){
+  .call{padding-top:10px}.call .tt,.call .hold,.call .stats,.call .controls{margin-top:7px}.call .tt{padding:7px 12px;gap:6px}
+  .call .count{font-size:clamp(52px,min(9vw,9vh),104px);height:clamp(52px,min(9vw,9vh),104px);margin:8px 0 2px}.stats div{padding:5px 10px}
+}
+.controls button{min-height:48px}
+@media (max-width:899px){.controls{position:fixed;left:0;right:0;bottom:0;z-index:6;margin:0;background:color-mix(in srgb,var(--bg) 96%,transparent);border-top:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin:10px 0 0;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stats div{background:var(--panel);padding:7px 10px;min-width:0}
+.stats dt{font-size:10px;color:var(--muted);white-space:nowrap}
+.stats dd{margin:2px 0 0;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stats dd .chip{font-size:11px;padding:2px 6px}
+.rlist{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.r-hdr{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--tint);font:400 14px/1.3 var(--display);color:var(--tint-fg)}
+.r-hdr span:last-child{font:12px var(--body);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.r-row{display:grid;grid-template-columns:86px 56px minmax(0,1fr) 58px 64px;gap:10px;align-items:center;min-height:50px;padding:8px 12px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.r-t{font-weight:700}.r-d{color:var(--muted);font-size:13px}
+.r-main{min-width:0}
+.r-main b{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-main small{display:block;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-row .chip{font-size:11px;padding:2px 8px}
+.r-go{padding:4px 10px;font-size:12px}
+/* Laptop: Go and row tools appear on hover or keyboard focus. Touch: always there, and big enough for a thumb. */
+@media (hover:hover){.r-go,.grid td.act button{opacity:0}.r-row:hover .r-go,.r-go:focus-visible,.r-go[data-arm],.grid tr:hover td.act button,.grid td.act button:focus-visible{opacity:1}}
+@media (pointer:coarse){.r-go{padding:10px 16px;font-size:14px}.grid td.act button{padding:8px 10px}}
+.r-go[data-arm]{background:var(--warn);border-color:var(--warn);color:#1a1200;font-weight:700}
+.r-row.is-live{background:var(--brand);color:var(--on-brand)}
+.r-row.is-live .r-d,.r-row.is-live small{color:inherit;opacity:.8}
+.t-over .r-row.is-live{background:var(--bad-bg2)}
+.r-row.is-next{background:color-mix(in srgb,var(--brand) 12%,var(--bg))}
+.r-row.is-done{opacity:.42}
+@media (max-width:560px){.r-row{grid-template-columns:84px minmax(0,1fr) 64px}.r-d,.r-row .chip,.r-row .slot{display:none}}
+.d-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.d-card h3{font:400 18px/1.25 var(--display);margin:6px 0 2px}
+.d-card p{margin:0;color:var(--muted);font-size:13px}
+.tech{display:grid;gap:8px;margin:12px 0 0}
+.tech div{background:var(--panel2);border-radius:8px;padding:8px 10px;min-width:0}
+.tech dt{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tech dd{margin:3px 0 0;overflow-wrap:anywhere;font-size:13px}
+.timer .tech{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.timer .tech div{background:rgba(0,0,0,.22)}
+.timer .tech dt{color:inherit;opacity:.7}
+
+/* Crew */
+.crew{padding-block:14px 40px;display:grid;gap:14px}
+.strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.strip .clock{font:700 24px/1 var(--body);color:var(--fg)}
+.strip .chip{min-width:104px;text-align:center}
+.stats .chip{min-width:84px;text-align:center}  /* 'On time' to '1:20:11 over' without nudging neighbours */
+.crew-grid{display:grid;gap:14px}
+@media (min-width:960px){.crew-grid{grid-template-columns:1.4fr 1fr;align-items:start}}
+.crew .timer{padding:24px}
+.crew .count{font-size:clamp(72px,13vw,150px);height:clamp(72px,13vw,150px)}
+.crew .timer{--h2:clamp(24px,3.4vw,38px)}
+.crew .timer .tech{min-height:62px}  /* a row kept for tech notes, so the card doesn't grow when they appear */
+
+/* Timer output (confidence monitor) */
+body[data-view="timer"] .top{display:none}
+.tv{position:fixed;inset:0;display:grid;grid-template-rows:auto 1fr auto auto;gap:2vh;padding:4vh 5vw;background:#000;color:#fff;text-align:center}
+.t-over .tv{background:#4a0f0b}.t-warn .tv{background:#3d2006}
+.tv-top{display:flex;justify-content:space-between;align-items:center;font:700 3vh/1 var(--body);font-variant-numeric:tabular-nums;color:#bbb}
+.tv-top .ctl{display:flex;gap:6px;opacity:.25}
+.tv-top .ctl button,.tv-top .ctl .btn{padding:4px 10px;font-size:12px;border-radius:6px}
+.tv-top .ctl:hover,.tv-top .ctl:focus-within{opacity:1}
+@media (pointer:coarse){.tv-top .ctl{opacity:.55}}  /* no hover on a touch screen */
+.tv-mid{display:grid;align-content:center;gap:2vh}
+.tv-title{font:400 5vh/1.15 var(--display);color:#ddd;height:2.3em;display:flex;align-items:flex-end;justify-content:center}  /* always two lines tall, so the digits never move */
+.tv-title span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tv .count{font-size:min(34vh,26vw);height:min(34vh,26vw);justify-content:center;margin:0;letter-spacing:-.04em}
+.tv .prog{height:2.2vh;border-radius:1.1vh;background:#222}
+.tv-next{font-size:3vh;line-height:1.3;height:1.3em;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+@media print{
+  .top,.tools,.grid td.act,.grid th.c-act{display:none!important}
+  body{background:#fff;color:#000}
+  .grid-wrap{max-height:none;overflow:visible;border:0}
+  .grid th{position:static;background:none;color:#000}
+  .grid td,.grid tr.hdr td,.grid tr:nth-child(even) td{background:none!important;color:#000}
+  .grid input,.grid textarea,.grid select,.meta input{color:#000;border:0}
+}
+@media (prefers-reduced-motion:no-preference){.prog i{transition:width .5s linear}}
+</style>
+</head>
+<body>
+<header class="top wrap" id="top"></header>
+<main id="app"></main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const COLS = [
+  {k:'cue', h:'Cue', tech:1}, {k:'start', h:'Start'}, {k:'dur', h:'Dur'}, {k:'title', h:'Segment'}, {k:'who', h:'Who'},
+  {k:'audio', h:'Audio', tech:1}, {k:'lx', h:'Lighting', tech:1}, {k:'vid', h:'Video', tech:1}, {k:'notes', h:'Notes', tech:1},
+];
+const TECH = [['audio', 'Audio'], ['lx', 'Lighting'], ['vid', 'Video'], ['notes', 'Notes']];
+const KINDS = {'':'Type', talk:'Talk', panel:'Panel', break:'Break', free:'Free', video:'VT', music:'Music', other:'Other'};
+
+/* ---------- helpers */
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const uid = () => Math.random().toString(36).slice(2, 10);
+const today = () => new Date().toLocaleDateString('en-CA');
+const hm = ms => ms == null || isNaN(ms) ? '' : new Date(ms).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+const hms = ms => new Date(ms).toLocaleTimeString('en-GB');
+const fmtDate = d => d ? new Date(d + 'T12:00').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', year:'numeric'}) : '';
+function fmtDur(s) {
+  s = Math.round(Math.abs(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? `${h}:${pad(m)}:${pad(x)}` : `${m}:${pad(x)}`;
+}
+// "5" = 5 minutes, "5:30" = m:ss, "1:05:00" = h:mm:ss. Anything else is rejected.
+function parseDur(v) {
+  v = String(v).trim();
+  if (/^\d+(\.\d+)?$/.test(v)) return Math.round(v * 60);
+  if (!/^\d+(:\d{1,2}){1,2}$/.test(v)) return null;
+  return v.split(':').reduce((a, b) => a * 60 + +b, 0);
+}
+// The app's name and colours, set on the Admin page (data/settings.json on the server).
+let BRAND = {};
+const appName = () => esc(BRAND.name || 'ShowPace');
+function applyBrand(b) {
+  if (!b?.name) return;
+  BRAND = b; store.set('brand', b);
+  const st = document.documentElement.style;
+  for (const k of ['brand', 'brand2', 'brand3', 'bg']) if (b[k]) st.setProperty('--' + k, b[k]);
+  st.setProperty('--on-brand', b.onBrand || '#fff');
+  document.title = b.name;
+  $('meta[name="theme-color"]').content = b.bg;
+  $('meta[name="apple-mobile-web-app-title"]').content = b.name;
+}
+const kindOf = it => Object.hasOwn(KINDS, it.kind) ? it.kind : '';  // only known types reach a class name
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem('showpace.' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('showpace.' + k, JSON.stringify(v)); } catch {} },
+};
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200);
+}
+
+/* ---------- state */
+const SRC = uid();
+// Every device sets its clock by the server's, so a speaker iPad and the caller's laptop agree even if their own clocks don't.
+// Each update carries the server time; network delay only ever makes it look early, so the largest offset seen is the truest.
+let skew = 0, skewSeen = false;
+const nowMs = () => Date.now() + skew;
+let R = {}, me = null, isAdmin = false, show = null, sid = null, es = null, viewers = 0, online = false, dirty = false, pushT, lastJs = '';
+let simple = store.get('simple') === true;
+const canEdit = () => !!me && !R.token;
+
+function route() {
+  const tok = location.pathname.match(/^\/v\/([\w-]+)/)?.[1];
+  const [a, b, c] = location.hash.replace(/^#\/?/, '').split('/');
+  if (tok) return {token:tok, view:['order', 'timer'].includes(a) ? a : 'crew'};
+  const rtok = location.pathname.match(/^\/r\/([\w-]+)/)?.[1];
+  if (rtok) return {token:rtok, view:'remote'};
+  if (location.pathname === '/crew') return {view:'crewlist'};
+  if (a === 's' && b) return {id:b, view:['call', 'crew', 'timer'].includes(c) ? c : 'edit'};
+  if (a === 'admin') return {view:'admin'};
+  return {view:'shows'};
+}
+
+/* ---------- server */
+async function api(path, opts = {}) {
+  const r = await fetch(path, {...opts, headers:{'content-type':'application/json', 'x-showpace-src':SRC}});
+  const data = (r.headers.get('content-type') || '').includes('json') ? await r.json() : null;
+  if (r.status === 401 && !R.token) { me = null; store.set('me', null); }
+  return {ok:r.ok, status:r.status, data};
+}
+async function ensureMe() {
+  if (me) return true;
+  try {
+    const r = await api('/api/me');
+    if (r.ok) { me = r.data.user; isAdmin = r.data.admin; store.set('me', me); store.set('admin', isAdmin); return true; }
+    r.data?.setup ? viewSetup() : viewLogin(); return false;
+  } catch {
+    me = store.get('me'); isAdmin = !!store.get('admin');  // offline: carry on with this device's copy
+    if (me) return true;
+    viewLogin('ShowPace cannot reach the server. Check the internet connection and try again.'); return false;
+  }
+}
+const cachePut = () => sid && store.set('show.' + sid, {s:show, d:dirty});
+function closeShow() { es?.close(); es = null; sid = null; show = null; viewers = 0; online = false; lastJs = ''; }
+async function openShow() {
+  closeShow();
+  sid = R.token ? 'v:' + R.token : R.id;
+  const c = store.get('show.' + sid);
+  show = c?.s || null; dirty = !!c?.d;
+  try {
+    const r = await api(R.token ? `/api/view/${R.token}` : `/api/shows/${R.id}`);
+    if (r.status === 401) { viewLogin(); return false; }
+    if (!r.ok) { show = null; viewMissing(r.data?.error || 'That show could not be found.'); return false; }
+    if (!dirty) show = r.data; else show.live = r.data.live;  // unsent edits are kept; where the show is comes from the server
+  } catch {
+    if (!show) { viewMissing('ShowPace cannot reach the server, and this device has no saved copy of this show.'); return false; }
+  }
+  cachePut();
+  connect();
+  return true;
+}
+function connect() {
+  const src = es = new EventSource(R.token ? `/api/events/v/${R.token}` : `/api/events/${R.id}`);
+  src.onopen = () => { online = true; skewSeen = false; syncChip(); if (dirty) push(); };
+  // The browser retries a dropped stream itself, but gives up for good on an error reply (a restart, too many viewers)
+  src.onerror = () => { online = false; syncChip(); if (src.readyState === 2) setTimeout(() => es === src && connect(), 3000); };
+  src.onmessage = e => {
+    const m = JSON.parse(e.data), js = JSON.stringify(m.show), was = lastJs && JSON.parse(lastJs).live;
+    viewers = m.viewers;
+    if (m.t) { const s = m.t - Date.now(); skew = skewSeen ? Math.max(skew, s) : s; skewSeen = true; }
+    if (js === lastJs || m.show.src === SRC) { lastJs = js; return tick(); }
+    // With unsent edits here, still follow a Complete from the phone remote, unless this device has moved the show itself
+    if (dirty && JSON.stringify(show.live) !== JSON.stringify(was)) { lastJs = js; return tick(); }
+    lastJs = js;
+    if (dirty) show.live = m.show.live; else show = m.show;
+    cachePut();
+    // Don't rebuild the grid under someone's cursor.
+    if (R.view === 'edit' && document.activeElement?.closest('#grid, .meta')) tick(); else render();
+  };
+}
+const remoteKey = () => R.view === 'remote' ? store.get('rkey.' + R.token) : null;
+function save() {
+  if (canEdit()) dirty = true;
+  cachePut();
+  if (remoteKey()) return sendLive();
+  if (!canEdit()) return;
+  syncChip();
+  clearTimeout(pushT); pushT = setTimeout(push, 300);
+}
+async function sendLive() {  // the phone remote can only change the live state, never the running order
+  const r = await api(`/api/remote/${R.token}/act`, {method:'POST', body:JSON.stringify({key:remoteKey(), live:show.live})}).catch(() => null);
+  if (r?.status === 403) { store.set('rkey.' + R.token, null); toast(r.data?.error); render(); }
+  else if (!r?.ok) {
+    toast('Not sent: ShowPace cannot reach the server');
+    if (lastJs) { show = JSON.parse(lastJs); cachePut(); render(); }  // back to what the server last said
+  }
+}
+async function push() {
+  if (!show || !canEdit()) return;
+  try {
+    const r = await api(`/api/shows/${show.id}`, {method:'PUT', body:JSON.stringify(show)});
+    if (r.status === 401) return viewLogin('Your login has run out. Log in again and your changes will be sent.');
+    if (!r.ok) throw Error();
+    dirty = false; cachePut();
+  } catch {}
+  syncChip();
+}
+function syncChip() {
+  const el = $('[data-t="sync"]');
+  if (!el) return;
+  const [txt, cls] = !online ? ['Offline', 'bad'] : R.token ? ['Live', 'ok'] : dirty ? ['Saving', ''] : ['Synced', 'ok'];
+  el.textContent = txt; el.className = 'sync ' + cls;
+  el.title = !online ? 'Offline: changes are saved on this device and sent when the connection is back' : txt;
+}
+
+/* ---------- timing */
+const isH = it => it.type === 'header';
+const idx = id => show.items.findIndex(x => x.id === id);
+const liveIdx = () => idx(show.live.id);
+const nextIdx = i => { for (let k = i + 1; k < show.items.length; k++) if (!isH(show.items[k])) return k; return -1; };
+const state = () => nextIdx(-1) < 0 ? 'empty' : show.live.id === 'END' ? 'done' : liveIdx() >= 0 ? 'live' : 'ready';
+// The live segment's real length: its planned time, plus ±1m nudges, plus time travel.
+const durOf = it => isH(it) ? 0 : it.dur + (it.id === show.live.id ? (show.live.nudge || 0) + (show.live.travel || 0) : 0);
+const realLeft = now => (show.live.at + durOf(show.items[liveIdx()]) * 1000 - now) / 1000;
+// What the speaker sees. After time travel the count runs a little fast or slow so it hits zero at the real end, with no jump.
+function shownLeft(now) {
+  const rr = realLeft(now), tt = show.live.tt;
+  return !tt || rr <= 0 ? rr : tt.d0 * rr / tt.r0;
+}
+const fresh = l => { l.nudge = 0; l.travel = 0; l.tt = null; l.hold = null; };
+const bend = l => ({nudge:l.nudge || 0, travel:l.travel || 0, tt:l.tt || null});  // kept in the log so Back can restore it
+// Free: no countdown. It runs until its 'until' time (edited as the next cue's Start), which anchors everything after it.
+const isFree = it => it?.kind === 'free';
+function untilMs(it, from) {
+  if (!it.until) return from;
+  const [hh, mm] = it.until.split(':').map(Number), d = new Date(from);
+  d.setHours(hh, mm, 0, 0);
+  const t = d.getTime() + (d.getTime() < from - 432e5 ? 864e5 : 0);  // past midnight
+  return Math.max(from, t);
+}
+const after = (it, t) => isFree(it) ? untilMs(it, t) : isH(it) ? t : t + durOf(it) * 1000;
+const startMs = () => new Date(`${show.date || today()}T${show.start || '09:00'}`).getTime();
+function planned() {
+  let t = startMs();
+  const starts = show.items.map(it => { const s = t; t = isFree(it) ? untilMs(it, t) : isH(it) ? t : t + it.dur * 1000; return s; });
+  return {starts, end:t};
+}
+// Planned times, replaced by what actually happened, then pushed on from now for everything still to come.
+function expected(now) {
+  const p = planned(), st = state();
+  if (st === 'ready' || st === 'empty') return p;
+  const starts = p.starts.slice();
+  for (const l of show.live.log) { const k = idx(l.id); if (k >= 0) starts[k] = l.start; }
+  if (st === 'done') return {starts, end:show.live.log.at(-1)?.end ?? p.end};
+  const i = liveIdx();
+  starts[i] = show.live.at;
+  let t = isFree(show.items[i]) ? untilMs(show.items[i], now) : Math.max(now, show.live.at + durOf(show.items[i]) * 1000);
+  for (let k = i + 1; k < starts.length; k++) { starts[k] = t; t = after(show.items[k], t); }
+  return {starts, end:t};
+}
+function drift(now) {
+  const d = Math.round((expected(now).end - planned().end) / 1000);
+  return Math.abs(d) < 30 ? ['On time', ''] : d > 0 ? [`${fmtDur(d)} over`, 'over'] : [`${fmtDur(d)} under`, 'under'];
+}
+const blank = () => ({id:uid(), cue:`Q${show.items.filter(x => !isH(x)).length + 1}`, title:'', who:'', dur:300, kind:'', audio:'', lx:'', vid:'', notes:''});
+
+/* ---------- shared pieces */
+function topShow() {
+  const base = `#s/${show.id}`;
+  const tabs = R.token ? [['crew', 'Crew', '#crew'], ['order', 'Running order', '#order'], ['timer', 'Clock', '#timer']]
+    : [['edit', 'Edit', base], ['call', 'Call', base + '/call'], ['crew', 'Crew', base + '/crew'], ['timer', 'Clock', base + '/timer']];
+  $('#top').innerHTML = `<a class="logo" href="${R.token ? '/crew' : '#'}" title="${R.token ? "Today's shows" : 'All shows'}"><span>${appName()}</span></a>
+    <div class="show-name"><b>${esc(show.title || 'Untitled show')}</b><small>${fmtDate(show.date)}</small></div>
+    <nav class="tabs" aria-label="View">${tabs.map(([v, l, h]) => `<a href="${h}"${R.view === v ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>
+    <div class="seg" role="group" aria-label="Detail"><button data-a="mode" data-v="0" aria-pressed="${!simple}">Technical</button><button data-a="mode" data-v="1" aria-pressed="${simple}">Simple</button></div>
+    <div class="right"><span class="sync" data-t="sync"></span>${R.token ? '' : `
+      <details class="crew-menu"><summary class="btn${show.onCrew ? ' on' : ''}">${show.onCrew ? 'Live to crew' : 'Crew'} ▾</summary>
+        <div class="menu"><p>${show.onCrew ? `On the crew page${show.crewLocked ? ', with a password' : ', crew go straight in'}.` : 'Not on the crew page yet. Push live to list it there.'}</p>
+          <button data-a="pushLive" class="${show.onCrew ? '' : 'primary'}">${show.onCrew ? 'Take off the crew page' : 'Push live'}</button>
+          <button data-a="copyLink">Copy this show's crew link</button><button data-a="crewPage">Copy crew page link</button>
+          <button data-a="remote">${show.remoteOn ? 'Caller remote: show QR' : 'Set up caller remote'}</button>${show.remoteOn ? '<button data-a="remotePass">New remote password</button>' : ''}</div></details>`}</div>`;
+  syncChip();
+}
+const techGrid = it => {
+  const f = it ? TECH.filter(([k]) => it[k]) : [];
+  return f.length ? `<dl class="tech">${f.map(([k, h]) => `<div><dt>${h}</dt><dd>${esc(it[k])}</dd></div>`).join('')}</dl>` : '';
+};
+function timerCard(withTech) {
+  const st = state(), i = liveIdx();
+  // Same slots in every state, so the card is always the same height
+  const slots = (cls, lab, h2, who, count, sub, prog, extra = '') => `<section class="timer ${cls}"><div class="lab">${lab}</div><div class="head"><h2>${h2}</h2><p class="who">${who}</p></div>
+    <div class="count" data-t="count">${count}</div><p class="sub" data-t="sub">${sub}</p><div class="prog"><i data-t="prog" style="width:${prog}%"></i></div>${extra}</section>`;
+  if (st === 'empty') return slots('idle', 'Nothing to run yet', 'Add segments in Edit', '', '0:00', '', 0);
+  // Holding (crew arriving) and Thank you (show over): the event name and the time of day, then the countdown takes over
+  const extra = withTech && !simple ? '<dl class="tech"></dl>' : '';
+  if (show.live.hold) return slots('is-live', 'Adhoc', '&nbsp;', '', fmtDur(show.live.hold.dur), '', 0, extra);
+  if (st === 'ready') return slots('idle', 'Before the show', esc(show.title || 'Untitled show'), `First cue ${hm(planned().starts[nextIdx(-1)])}`, hms(nowMs()), 'Time now', 0, extra);
+  if (st === 'done') return slots('idle', 'Show complete', 'Thank you', `Finished ${hm(expected(nowMs()).end)} · planned ${hm(planned().end)}`, hms(nowMs()), 'Time now', 100, extra);
+  const it = show.items[i];
+  return slots('is-live', 'Now', esc(it.title || 'Untitled'), esc(it.who), isFree(it) ? hms(nowMs()) : fmtDur(it.dur), '', 0, withTech && !simple ? techGrid(it) || '<dl class="tech"></dl>' : '');
+}
+function card(label, it) {
+  if (!it) return `<section class="d-card"><div class="lab">${label}</div><h3>End of show</h3></section>`;
+  return `<section class="d-card"><div class="lab">${label} · <span data-exp="${idx(it.id)}"></span></div>
+    <h3>${esc(it.title || 'Untitled')}</h3><p>${[esc(it.who), isFree(it) ? 'Free time' : fmtDur(it.dur)].filter(Boolean).join(' · ')}</p>${simple ? '' : techGrid(it)}</section>`;
+}
+function rundown(from = 0) {
+  const st = state(), i = liveIdx(), nx = st === 'live' ? nextIdx(i) : nextIdx(-1);
+  const log = Object.fromEntries(show.live.log.map(l => [l.id, l]));
+  return `<div class="rlist">${show.items.map((it, k) => k < from ? '' : isH(it)
+    ? `<div class="r-hdr"><span>${esc(it.title || 'Section')}</span><span data-hsum="${k}"></span></div>`
+    : `<div class="r-row${k === i ? ' is-live' : log[it.id] ? ' is-done' : k === nx ? ' is-next' : ''}" data-i="${k}">
+        <span class="r-t" data-exp="${k}"></span>
+        <span class="r-d">${log[it.id] ? fmtDur((log[it.id].end - log[it.id].start) / 1000) : isFree(it) ? 'free' : fmtDur(it.dur)}</span>
+        <span class="r-main"><b>${esc(it.title || 'Untitled')}</b>${it.who ? `<small>${esc(it.who)}</small>` : ''}</span>
+        ${kindOf(it) ? `<span class="chip k-${kindOf(it)}">${KINDS[kindOf(it)]}</span>` : '<span class="slot"></span>'}
+        ${canEdit() && k !== i && R.view === 'call' ? '<button class="r-go" data-a="goto" title="Jump to this segment now">Go</button>' : '<span></span>'}
+      </div>`).join('')}</div>`;
+}
+
+/* ---------- views */
+function viewLogin(msg = '') {
+  closeShow();
+  document.body.dataset.view = 'login';
+  $('#top').innerHTML = '';
+  $('#app').innerHTML = `<form class="login" id="login"><h1>${appName()}</h1><p class="muted">${BRAND.org ? esc(BRAND.org) + ' login' : 'Log in to run your shows'}</p>
+    ${msg ? `<p class="err">${esc(msg)}</p>` : ''}
+    <label>Username<input id="l-user" autocomplete="username" autocapitalize="none" required></label>
+    <label>Password<input id="l-pass" type="password" autocomplete="current-password" required></label>
+    <button class="primary">Log in</button><p class="err" id="l-err" hidden></p></form>`;
+  $('#login').onsubmit = async e => {
+    e.preventDefault();
+    const err = $('#l-err');
+    try {
+      const r = await api('/api/login', {method:'POST', body:JSON.stringify({user:$('#l-user').value, pass:$('#l-pass').value})});
+      if (!r.ok) throw Error(r.data?.error || 'Login failed');
+      me = r.data.user; isAdmin = r.data.admin; store.set('me', me); store.set('admin', isAdmin); go();
+    } catch (x) { err.hidden = false; err.textContent = x instanceof TypeError ? 'ShowPace cannot reach the server.' : x.message; }
+  };
+}
+// First run: no logins yet, so make the admin one
+function viewSetup() {
+  closeShow();
+  document.body.dataset.view = 'login';
+  $('#top').innerHTML = '';
+  $('#app').innerHTML = `<form class="login" id="setup"><h1>${appName()}</h1>
+    <p>Welcome! First, make your admin login. You'll use it to run shows and to add everyone else.</p>
+    <label>Username<input id="s-user" autocomplete="username" autocapitalize="none" minlength="2" maxlength="32" required></label>
+    <label>Password<input id="s-pass" type="password" autocomplete="new-password" minlength="10" required></label>
+    <label>Password again<input id="s-pass2" type="password" autocomplete="new-password" minlength="10" required></label>
+    <p class="muted">At least 10 characters. Three random words works well.</p>
+    <button class="primary">Create admin login</button><p class="err" id="s-err" hidden></p></form>`;
+  $('#setup').onsubmit = async e => {
+    e.preventDefault();
+    const err = $('#s-err');
+    try {
+      if ($('#s-pass').value !== $('#s-pass2').value) throw Error("The two passwords don't match");
+      const r = await api('/api/setup', {method:'POST', body:JSON.stringify({user:$('#s-user').value, pass:$('#s-pass').value})});
+      if (r.status === 409) return viewLogin(r.data.error);
+      if (!r.ok) throw Error(r.data?.error || "That didn't work. Try again.");
+      me = r.data.user; isAdmin = true; store.set('me', me); store.set('admin', true); go();
+    } catch (x) { err.hidden = false; err.textContent = x instanceof TypeError ? 'ShowPace cannot reach the server.' : x.message; }
+  };
+}
+// Admin: logins and app settings. Only admins get here.
+async function viewAdmin() {
+  $('#top').innerHTML = `<a class="logo" href="#"><span>${appName()}</span></a><div class="show-name"><b>Admin</b></div>
+    <div class="right"><a class="btn" href="#">Back to shows</a></div>`;
+  const out = html => $('#app').innerHTML = `<section class="shows wrap admin">${html}</section>`;
+  if (!isAdmin) return out('<div class="empty">Only admins can open this page.</div>');
+  let u, st;
+  try { [u, st] = await Promise.all([api('/api/users'), api('/api/settings')]); } catch { return out('<div class="empty">ShowPace cannot reach the server.</div>'); }
+  if (!u.ok || !st.ok) return out(`<div class="empty">${esc(u.data?.error || st.data?.error || 'Something went wrong')}</div>`);
+  const s = st.data;
+  out(`<div class="shows-head"><h1>Admin</h1></div>
+    <h2 class="lab">Logins</h2>
+    <div class="list">${u.data.map(x => `<article class="show-row user-row"><div><h2>${esc(x.name)}${x.name === me ? ' <small class="muted">(you)</small>' : ''}</h2>
+        <div class="meta2">${x.admin ? '<span class="chip under">Admin</span> Runs shows, adds people, changes settings' : 'Makes, edits and calls shows'}</div></div>
+      <div class="acts"><button data-a="userEdit" data-name="${esc(x.name)}" data-admin="${x.admin ? 1 : ''}">Change</button>${x.name === me ? '' : `<button data-a="userDel" data-name="${esc(x.name)}">Remove</button>`}</div></article>`).join('')}</div>
+    <form class="form" id="u-form" style="margin-top:12px">
+      <label>Username<input id="u-name" autocapitalize="none" autocomplete="off" minlength="2" maxlength="32" required></label>
+      <label>Password<input id="u-pass" type="password" autocomplete="new-password" placeholder="At least 10 characters"></label>
+      <label class="check"><input type="checkbox" id="u-admin"> Admin</label>
+      <button class="primary" id="u-go">Add login</button><button type="button" data-a="userNew" id="u-cancel" hidden>Cancel</button>
+      <p class="muted full" id="u-help">Admins can add people and change these settings. Everyone else can make, edit and call shows.</p><p class="err full" id="u-err" hidden></p></form>
+    <h2 class="lab">Settings</h2>
+    <form class="form" id="st-form">
+      <label class="grow">App name<input id="st-name" maxlength="40" value="${esc(s.name)}"></label>
+      <label class="grow">Your company<input id="st-org" maxlength="80" value="${esc(s.org)}" placeholder="Shown on the login page"></label>
+      <label>Main colour<input type="color" id="st-brand" value="${esc(s.brand.toLowerCase())}"></label>
+      <label>Background<input type="color" id="st-bg" value="${esc(s.bg.toLowerCase())}"></label>
+      <label>Stay logged in (days)<input type="number" id="st-days" min="1" max="365" value="${+s.sessionDays}"></label>
+      <button type="button" data-a="lookReset">Default colours</button><button class="primary">Save settings</button>
+      <p class="muted full">The background has to be dark, because the screens are made for dark rooms.</p><p class="err full" id="st-err" hidden></p></form>`);
+  const fail = (id, x) => { const e = $(id); e.hidden = false; e.textContent = x instanceof TypeError ? 'ShowPace cannot reach the server.' : x.message; };
+  $('#u-form').onsubmit = async e => {
+    e.preventDefault();
+    try {
+      const r = await api('/api/users', {method:'POST', body:JSON.stringify({user:$('#u-name').value, pass:$('#u-pass').value, admin:$('#u-admin').checked})});
+      if (!r.ok) throw Error(r.data?.error || "That didn't work");
+      if (r.data.user === me) { isAdmin = $('#u-admin').checked; store.set('admin', isAdmin); }
+      toast('Saved'); viewAdmin();
+    } catch (x) { fail('#u-err', x); }
+  };
+  $('#st-form').onsubmit = async e => {
+    e.preventDefault();
+    try {
+      const r = await api('/api/settings', {method:'PUT', body:JSON.stringify({name:$('#st-name').value, org:$('#st-org').value,
+        brand:$('#st-brand').value, bg:$('#st-bg').value, sessionDays:$('#st-days').value})});
+      if (!r.ok) throw Error(r.data?.error || "That didn't work");
+      applyBrand(r.data); toast('Settings saved'); viewAdmin();
+    } catch (x) { fail('#st-err', x); }
+  };
+}
+function viewMissing(msg) {
+
+  document.body.dataset.view = 'missing';
+  $('#top').innerHTML = `<a class="logo" href="#"><span>${appName()}</span></a>`;
+  $('#app').innerHTML = `<div class="shows wrap"><div class="empty">${esc(msg)}</div></div>`;
+}
+
+// /crew: one easy address for crew. Lists shows you've pushed live; tap to go straight in, or type the show's crew password.
+async function viewCrewList() {
+  document.body.dataset.view = 'crewlist';
+  $('#top').innerHTML = `<a class="logo" href="/crew"><span>${appName()}</span></a><div class="show-name"><b>Crew</b></div>`;
+  const day = d => d === today() ? 'Today' : fmtDate(d);
+  let list;
+  try { list = (await api('/api/crew')).data || []; }
+  catch { $('#app').innerHTML = `<section class="shows wrap"><div class="empty">ShowPace cannot reach the server. Check your signal and refresh.</div></section>`; return; }
+  $('#app').innerHTML = `<section class="shows wrap"><div class="shows-head"><h1>Shows</h1></div><div class="list">${list.length ? list.map(s => s.locked
+    ? `<article class="crew-card"><div><div class="d">${day(s.date)} · ${esc(s.start)}${s.live ? ' <span class="chip under">Live now</span>' : ''}</div><h2>${esc(s.title || 'Untitled show')}</h2></div>
+        <form class="crew-pass" data-id="${s.id}"><input type="password" class="f" placeholder="Crew password" aria-label="Crew password for ${esc(s.title)}" autocomplete="off" required><button class="primary">Open</button></form><p class="err" hidden></p></article>`
+    : `<a class="crew-card" href="/v/${s.token}"><div><div class="d">${day(s.date)} · ${esc(s.start)}${s.live ? ' <span class="chip under">Live now</span>' : ''}</div><h2>${esc(s.title || 'Untitled show')}</h2></div><span class="btn primary">Open</span></a>`).join('')
+    : '<div class="empty">No shows are live yet. Ask the show caller to push the show live.</div>'}</div></section>`;
+}
+document.addEventListener('submit', async e => {
+  const f = e.target.closest('.crew-pass');
+  if (!f) return;
+  e.preventDefault();
+  const err = f.nextElementSibling;
+  try {
+    const r = await api(`/api/crew/${f.dataset.id}`, {method:'POST', body:JSON.stringify({pass:f.querySelector('input').value})});
+    if (!r.ok) throw Error(r.data?.error || 'That password is not right');
+    location.href = `/v/${r.data.token}`;
+  } catch (x) { err.hidden = false; err.textContent = x instanceof TypeError ? 'ShowPace cannot reach the server.' : x.message; }
+});
+
+let showArchived = false;
+async function viewShows() {
+  $('#top').innerHTML = `<a class="logo" href="#"><span>${appName()}</span></a><div class="show-name"><b>Shows</b></div>
+    <div class="right"><span class="muted">${esc(me)}</span>${isAdmin ? '<a class="btn" href="#admin">Admin</a>' : ''}<button data-a="logout">Log out</button></div>`;
+  let list = store.get('shows') || [];
+  const draw = () => {
+    // Today and upcoming first (soonest at the top), then past shows (most recent first)
+    const t = today(), up = s => s.date >= t, when = s => s.date + s.start;
+    const rows = list.filter(s => showArchived || !s.archived).sort((a, b) => up(b) - up(a) || (up(a) ? when(a).localeCompare(when(b)) : when(b).localeCompare(when(a))));
+    $('#app').innerHTML = `<section class="shows wrap">
+      <div class="shows-head"><h1>Shows</h1>
+        <label class="muted"><input type="checkbox" id="arch"${showArchived ? ' checked' : ''}> Show archived</label>
+        <button data-a="crewPage" title="One link for all crew: lists every show you have pushed live">Copy crew page link</button>
+        <a class="btn" href="/template.csv" download="ShowPace running order template.csv" title="The columns ShowPace reads, with example rows">Download template</a>
+        <button data-a="importFile" title="A running order as CSV or Excel (.xlsx) becomes a new show">Upload running order</button><button class="primary" data-a="newShow">New show</button></div>
+      <form class="form" id="new" hidden>
+        <label class="grow">Show name<input id="n-title" required placeholder="Client, event and venue"></label>
+        <label>Date<input id="n-date" type="date" value="${today()}" required></label>
+        <label>Start<input id="n-start" type="time" value="09:00" required></label>
+        <button class="primary">Create show</button></form>
+      <input type="file" id="file" accept=".csv,.tsv,.txt,.xlsx,.xlsm,.numbers,.json" hidden>
+      <div class="list">${rows.length ? rows.map(s => `
+        <article class="show-row${s.date === today() ? ' today' : ''}${s.archived ? ' arch' : ''}">
+          <div class="d">${fmtDate(s.date)}<small>${s.date === today() ? 'Today · ' : ''}${esc(s.start)}</small></div>
+          <div><h2><a href="#s/${s.id}">${esc(s.title || 'Untitled show')}</a></h2>
+            <div class="meta2">${s.segments} segments · ${fmtDur(s.runtime)}${s.live ? ' · <span class="chip under">Live now</span>' : ''}${s.onCrew && !s.archived ? ` · <span class="chip k-talk">On crew page${s.crewLocked ? ', password' : ''}</span>` : ''}${s.archived ? ' · Archived' : ''}</div></div>
+          <div class="acts"><a class="btn" href="#s/${s.id}">Edit</a><a class="btn primary" href="#s/${s.id}/call">Call</a>
+            <button data-a="copyLink" data-token="${esc(s.viewToken)}">Crew link</button>
+            <button data-a="archive" data-id="${s.id}">${s.archived ? 'Restore' : 'Archive'}</button>${s.archived ? `<button data-a="deleteShow" data-id="${s.id}" data-title="${esc(s.title)}">Delete</button>` : ''}</div>
+        </article>`).join('') : `<div class="empty">No shows yet. Press New show to build your first running order.</div>`}</div></section>`;
+    $('#arch').onchange = e => { showArchived = e.target.checked; draw(); };
+    $('#new').onsubmit = async e => {
+      e.preventDefault();
+      const s = {title:$('#n-title').value.trim(), date:$('#n-date').value, start:$('#n-start').value, live:{id:null, at:null, log:[]},
+        items:[{id:uid(), cue:'Q1', title:'', who:'', dur:300, kind:'', audio:'', lx:'', vid:'', notes:''}]};
+      const r = await api('/api/shows', {method:'POST', body:JSON.stringify(s)});
+      if (r.ok) location.hash = `#s/${r.data.id}`; else toast(r.data?.error || 'Could not create the show');
+    };
+    $('#file').onchange = async e => {
+      const f = e.target.files[0]; e.target.value = '';
+      if (!f) return;
+      try {
+        let r;
+        if (/\.json$/i.test(f.name)) {  // an older export
+          const s = JSON.parse(await f.text());
+          r = await api('/api/shows', {method:'POST', body:JSON.stringify({...s, live:{id:null, at:null, log:[]}})});
+        } else {  // CSV or Excel: the server reads it and builds the show
+          const data = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result.split(',')[1]); fr.onerror = no; fr.readAsDataURL(f); });
+          r = await api('/api/import', {method:'POST', body:JSON.stringify({name:f.name, data})});
+        }
+        if (!r.ok) throw Error(r.data?.error);
+        toast('Show created. Check the date, name and timings.');
+        location.hash = `#s/${r.data.id}`;
+      } catch (x) { toast(x.message || 'That file could not be read'); }
+    };
+  };
+  draw();
+  try { const r = await api('/api/shows'); if (r.ok) { list = r.data; store.set('shows', list); draw(); } } catch {}
+}
+
+function viewEdit() {
+  topShow();
+  const ro = !canEdit(), dis = ro ? ' readonly' : '', tech = !simple, cols = COLS.filter(c => tech || !c.tech);
+  const done = new Set(show.live.log.map(l => l.id));
+  const acts = ro ? '' : `<td class="act"><button data-a="rowUp" title="Move up" aria-label="Move up">↑</button><button data-a="rowDown" title="Move down" aria-label="Move down">↓</button><button data-a="rowIns" title="Insert a segment below" aria-label="Insert below">+</button><button data-a="rowDel" title="Remove" aria-label="Remove">✕</button></td>`;
+  const cell = (c, it, i) => {
+    const fr = prevFree(i);
+    if (c.k === 'start' && fr >= 0) return `<td class="t"><input type="time" data-until="${fr}" value="${esc(show.items[fr].until)}" aria-label="Fixed start after free time" title="Fixed start: the free time before this runs until here"${dis}></td>`;
+    if (c.k === 'start') return `<td class="t" data-exp="${i}"></td>`;
+    if (c.k === 'dur' && isFree(it)) return `<td class="t muted free-dur" title="Free time has no duration: set the next cue's Start">Free</td>`;
+    if (c.k === 'dur') return `<td><input data-f="dur" value="${fmtDur(it.dur)}" aria-label="Duration" title="5 = 5 min, 5:30, or 1:05:00"${dis}></td>`;
+    if (c.k === 'title') return `<td><div class="seg-cell"><select data-f="kind" class="kind k-${kindOf(it) || 'none'}" aria-label="Type"${ro ? ' disabled' : ''}>${Object.entries(KINDS).map(([k, l]) => `<option value="${k}"${kindOf(it) === k ? ' selected' : ''}>${l}</option>`).join('')}</select><textarea data-f="title" rows="1" aria-label="Segment"${dis}>${esc(it.title)}</textarea></div></td>`;
+    return `<td><textarea data-f="${c.k}" rows="1" aria-label="${c.h}"${dis}>${esc(it[c.k])}</textarea></td>`;
+  };
+  $('#app').innerHTML = `<section class="edit wrap">
+    <div class="meta"><input class="m-title" data-m="title" value="${esc(show.title)}" placeholder="Show name" aria-label="Show name"${dis}>
+      <label>Date<input type="date" data-m="date" value="${esc(show.date)}"${dis}></label>
+      <label>Start<input type="time" data-m="start" value="${esc(show.start)}"${dis}></label></div>
+    <div class="tools">${ro ? '' : '<button class="primary" data-a="addRow">Add segment</button><button data-a="addHeader">Add section</button>'}
+      <span class="sp"></span><span class="sum" data-t="sum"></span>${ro ? '' : '<button data-a="export" title="The running order as a CSV, in the same columns as the template">Download CSV</button>'}<button data-a="print">Print</button></div>
+    <div class="grid-wrap"><table class="grid" id="grid"><thead><tr>${cols.map(c => `<th class="c-${c.k}">${c.h}</th>`).join('')}${ro ? '' : '<th class="c-act"><span class="sr">Row actions</span></th>'}</tr></thead>
+    <tbody>${show.items.map((it, i) => isH(it)
+      ? `<tr class="hdr" data-i="${i}" data-id="${esc(it.id)}"><td colspan="${cols.length}"><div class="hdr-cell"><input data-f="title" value="${esc(it.title)}" placeholder="Section heading" aria-label="Section heading"${dis}><span class="hsum" data-hsum="${i}"></span></div></td>${acts}</tr>`
+      : `<tr data-i="${i}" data-id="${esc(it.id)}" class="${it.id === show.live.id ? 'is-live' : done.has(it.id) ? 'is-done' : ''}">${cols.map(c => cell(c, it, i)).join('')}${acts}</tr>`).join('')}</tbody></table></div>
+  </section>`;
+}
+
+// Time travel: the caller's secret. Pick a new end (or minutes to save); the speaker's countdown then runs a touch
+// fast or slow to land on it, with no jump. Lives only here, never on crew or speaker screens.
+let ttTarget = null;  // the proposed new end while it's being filled in
+let holdMins = '';  // the hold time picked or typed, kept across redraws until play
+const curEnd = () => show.live.at + durOf(show.items[liveIdx()]) * 1000;
+const prevFree = i => { let k = i - 1; while (k >= 0 && isH(show.items[k])) k--; return k >= 0 && isFree(show.items[k]) ? k : -1; };
+function timeTravel() {  // always on the Call screen, greyed out when it can't be used, so nothing jumps
+  ttTarget = null;  // the boxes are drawn empty, so an old target can't be applied to a new segment
+  const st = state(), free = st === 'live' && isFree(show.items[liveIdx()]), live = st === 'live' && !free;
+  const t = live ? show.live.travel || 0 : 0, end = live ? hm(curEnd()) : '', off = live ? '' : ' disabled';
+  const msg = free ? 'Free time · no countdown to bend' : live ? 'Over time · back with the next segment' : st === 'done' ? 'Show complete' : 'Opens when the show starts';
+  return `<section class="tt${live ? '' : ' is-over'}"><div class="tt-head${t ? '' : ' idle'}"><span class="lab">Time travel</span><span class="tt-msg">${msg}</span><b>On · ${t < 0 ? 'saving' : 'adding'} ${fmtDur(t)}</b><button data-a="ttOff"${off}>Back off</button></div>
+    <div class="tt-grid"><label>Est. end<b data-t="ttEnd">${end || '--:--'}</b></label>
+      <label for="tt-end">New end<input type="time" id="tt-end" value="${end}"${off}></label>
+      <label for="tt-save">Mins saved<input type="number" id="tt-save" value="0" step="1" inputmode="numeric"${off}></label>
+      <button class="primary" data-a="ttGo"${off}>Time travel</button></div></section>`;
+}
+function ttSync(from) {
+  const cur = curEnd(), endEl = $('#tt-end'), saveEl = $('#tt-save');
+  if (from === 'end') {
+    const [hh, mm] = endEl.value.split(':').map(Number);
+    if (isNaN(hh) || isNaN(mm)) return;
+    const d = new Date(cur); d.setHours(hh, mm);  // keeps the end's own seconds, so the minutes come out whole
+    let t = d.getTime();
+    if (t - cur > 432e5) t -= 864e5; else if (cur - t > 432e5) t += 864e5;  // nearest day, so 00:05 after 23:50 works
+    ttTarget = t; saveEl.value = Math.round((cur - t) / 60000);
+  } else {
+    ttTarget = cur - (+saveEl.value || 0) * 60000; endEl.value = hm(ttTarget);
+  }
+}
+
+// When it all goes Pete Tong: a countdown off the schedule with no title, while the running order is fixed.
+// Go, Start, Complete or Back drop back into the show; Stop goes back to the segment that was running.
+function holdPanel() {
+  const on = !!show.live.hold;
+  return `<section class="hold" title="A countdown off the schedule, no title on screens. Go on any row drops back in."><span class="lab">Adhoc</span>
+    ${[5, 10, 20].map(m => `<button data-a="holdPick" data-m="${m}"${+holdMins === m ? ' class="sel"' : ''}>${m}m</button>`).join('')}
+    <input type="number" id="hold-m" value="${holdMins}" placeholder="Mins" min="1" step="1" inputmode="numeric" aria-label="Adhoc timer minutes"><button class="primary" data-a="hold" aria-label="Start the adhoc timer">▶</button><button data-a="holdOff"${on ? '' : ' disabled'}>Stop</button></section>`;
+}
+
+// The caller's controls and figures: on Call, and on the phone remote
+function callControls() {
+  const st = state(), i = liveIdx();
+  return `<div class="controls">${st === 'ready' ? '<button class="go wide" data-a="start">Start show</button>'
+    : st === 'live' ? `<button data-a="nudge" data-s="-60" title="Take a minute off now: the countdown jumps">−1m</button><button data-a="back" title="Undo the last Complete">Back</button><button class="go" data-a="complete">${nextIdx(i) < 0 ? 'Complete and end' : 'Complete'}</button><button data-a="nudge" data-s="60" title="Add a minute now: the countdown jumps">+1m</button>`
+    : st === 'done' ? '<button data-a="back">Back</button><button class="wide" data-a="reset" style="grid-column:2/-1">Reset show</button>' : ''}</div>`;
+}
+const statsHtml = () => `<dl class="stats">
+    <div><dt>Time now</dt><dd data-t="clock"></dd></div><div><dt>Over / under</dt><dd><span class="chip" data-t="drift"></span></dd></div>
+    <div><dt>Planned end</dt><dd>${hm(planned().end)}</dd></div><div><dt>Expected end</dt><dd data-t="end"></dd></div>
+    <div><dt>Show start</dt><dd>${hm(startMs())}</dd></div><div><dt>Watching</dt><dd data-t="viewers"></dd></div></dl>`;
+
+function viewCall() {
+  topShow();
+  const st = state(), i = liveIdx();
+  const cur = st === 'live' ? show.items[i] : null, nx = show.items[st === 'live' ? nextIdx(i) : nextIdx(-1)];
+  $('#app').innerHTML = `<section class="call wrap${simple ? ' simple' : ''}">
+    <div class="c-timer">${timerCard(false)}${canEdit() ? callControls() + timeTravel() + holdPanel() : ''}${statsHtml()}</div>
+    <div class="c-list">${rundown()}</div>
+    ${simple ? '' : `<div class="c-detail">${cur ? `<section class="d-card"><div class="lab">Now · tech</div>${techGrid(cur) || '<p>No technical notes for this segment.</p>'}</section>` : ''}${st === 'done' ? '' : card(st === 'ready' ? 'Up first' : 'Next', nx)}</div>`}
+  </section>`;
+}
+
+function viewCrew() {
+  topShow();
+  const st = state(), i = liveIdx(), nxI = st === 'live' ? nextIdx(i) : nextIdx(-1);
+  $('#app').innerHTML = `<section class="crew wrap">
+    <div class="strip"><span class="clock" data-t="clock"></span><span class="chip" data-t="drift"></span><span>Expected finish <b data-t="end"></b></span></div>
+    <div class="crew-grid"><div>${timerCard(true)}</div>
+      <div>${st === 'done' || st === 'empty' ? '' : card(st === 'ready' ? 'Up first' : 'Next', show.items[nxI])}${nxI >= 0 ? rundown(nextIdx(nxI)) : ''}</div></div>
+  </section>`;
+}
+
+function viewTimer() {
+  const st = state(), i = liveIdx(), live = st === 'live', nx = show.items[live ? nextIdx(i) : -1], hold = show.live.hold;
+  const counts = hold || live && !isFree(show.items[i]);
+  const title = hold ? '' : live ? esc(show.items[i].title) : st === 'done' ? 'Thank you' : esc(show.title || '');
+  const back = R.token ? '#crew' : `#s/${show.id}/call`;
+  $('#top').innerHTML = '';
+  $('#app').innerHTML = `<section class="tv">
+    <div class="tv-top"><span data-t="clock"></span><span class="ctl">${document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen ? `<button data-a="fullscreen" data-t="fs">${isFull() ? 'Exit full screen' : 'Full screen'}</button>` : ''}<a class="btn" href="${back}">Back</a></span></div>
+    <div class="tv-mid"><div class="tv-title"><span>${title}</span></div>
+      <div class="count" data-t="count">${hold ? fmtDur(hold.dur) : counts ? fmtDur(show.items[i].dur) : hms(nowMs())}</div><div class="prog"${counts ? '' : ' style="visibility:hidden"'}><i data-t="prog"></i></div></div>
+    <div class="tv-next">${nx ? 'Next: ' + esc(nx.title) : ''}</div><div></div>
+  </section>`;
+}
+
+// The phone remote: the show's crew link plus the remote password. The same controls as Call; the live state goes to the server.
+function viewRemote() {
+  const key = store.get('rkey.' + R.token), st = state(), i = liveIdx(), nx = show.items[st === 'live' ? nextIdx(i) : nextIdx(-1)];
+  $('#top').innerHTML = `<div class="show-name"><b>${esc(show.title || 'Untitled show')}</b><small>Caller remote</small></div><div class="right"><span class="sync" data-t="sync"></span></div>`;
+  syncChip();
+  if (!key) {
+    $('#app').innerHTML = `<section class="remote wrap"><form id="r-login"><h1 style="font:400 26px/1.2 var(--display);margin:0">Caller remote</h1>
+      <p class="muted" style="margin:0">Type the remote password the show caller gave you.</p>
+      <input type="password" id="r-pass" class="f" placeholder="Remote password" autocomplete="off" required><button class="primary" style="min-height:52px">Unlock</button><p class="err" id="r-err" hidden></p></form></section>`;
+    $('#r-login').onsubmit = async e => {
+      e.preventDefault();
+      const r = await api(`/api/remote/${R.token}`, {method:'POST', body:JSON.stringify({pass:$('#r-pass').value})}).catch(() => null);
+      if (r?.ok) { store.set('rkey.' + R.token, r.data.key); return render(); }
+      const err = $('#r-err'); err.hidden = false; err.textContent = r?.data?.error || 'ShowPace cannot reach the server.';
+    };
+    return;
+  }
+  $('#app').innerHTML = `<section class="remote wrap">${timerCard(false)}
+    <div class="r-next"><div class="lab">${st === 'ready' ? 'Up first' : 'Next'}${nx ? ` · <span data-exp="${idx(nx.id)}"></span>` : ''}</div>${nx ? esc(nx.title || 'Untitled') : 'End of show'}</div>
+    ${callControls()}${timeTravel()}${holdPanel()}${statsHtml()}</section>`;
+}
+
+// Redraws keep your place: the page and every scrolling panel stay where you left them.
+const SCROLLERS = ['.grid-wrap', '.c-list', '.c-detail', '.c-timer'];
+// Centre the rundown on the live segment when Call opens and each time the show moves on; otherwise leave your scroll alone.
+let followed = null;
+function followLive() {
+  const list = $('.c-list'), row = $('.r-row.is-live') || $('.r-row.is-next');
+  const key = R.view + ':' + show.id + ':' + show.live.id;
+  if (!list || !row || key === followed) return;
+  followed = key;
+  const l = list.getBoundingClientRect(), r = row.getBoundingClientRect();
+  list.scrollTop += r.top - l.top - (list.clientHeight - r.height) / 2;  // only the list scrolls, never the page
+}
+function render() {
+  if (!show) return;
+  const view = document.body.dataset.view, y = scrollY;
+  const kept = SCROLLERS.map(s => { const el = $(s); return el && [el.scrollTop, el.scrollLeft]; });
+  document.body.dataset.view = R.view;
+  ({edit:viewEdit, order:viewEdit, call:viewCall, crew:viewCrew, timer:viewTimer, remote:viewRemote})[R.view]();
+  if (view === R.view) {
+    SCROLLERS.forEach((s, n) => { const el = $(s); if (el && kept[n]) [el.scrollTop, el.scrollLeft] = kept[n]; });
+    scrollTo(0, y);
+  }
+  followLive();
+  tick(); wake();
+}
+
+/* ---------- once a second: numbers only, so buttons are never replaced mid-tap */
+// Only touch what changed: four times a second all day, so an older iPad isn't redrawing for nothing
+const put = (el, v) => { if (el.textContent !== v) el.textContent = v; };
+const setT = (k, v) => $$(`[data-t="${k}"]`).forEach(el => put(el, v));
+function tick() {
+  if (!show) return;
+  const now = nowMs(), st = state(), ex = expected(now), [dt, dc] = drift(now), p = planned();
+  setT('clock', hms(now)); setT('end', hm(ex.end)); setT('viewers', String(viewers));
+  if ((st === 'ready' || st === 'done') && !show.live.hold) setT('count', hms(now));
+  $$('[data-t="drift"]').forEach(el => { put(el, st === 'ready' ? 'Not started' : dt); el.className = 'chip ' + (st === 'ready' ? '' : dc); });
+  // Always the scheduled time; a red +Nm when that segment started, or is now expected to start, late.
+  $$('[data-exp]').forEach(el => {
+    const k = +el.dataset.exp, late = Math.round((ex.starts[k] - p.starts[k]) / 60000);
+    // Loud on Now and Next and in the cards, quiet down the list, nothing once a segment is done.
+    const row = el.closest('.r-row, tr'), done = row?.classList.contains('is-done'), loud = !row || row.matches('.is-live, .is-next');
+    const html = hm(p.starts[k]) + (late > 0 && !done ? ` <span class="late${loud ? '' : ' soft'}">+${late < 60 ? late + 'm' : Math.floor(late / 60) + 'h' + pad(late % 60)}</span>` : '');
+    if (el._h !== html) { el._h = html; el.innerHTML = html; }
+  });
+  $$('[data-hsum]').forEach(el => {
+    let s = 0, n = 0;
+    for (let j = +el.dataset.hsum + 1; j < show.items.length && !isH(show.items[j]); j++) { s += show.items[j].dur; n++; }
+    put(el, `${hm(p.starts[+el.dataset.hsum])} · ${n} ${n === 1 ? 'item' : 'items'} · ${fmtDur(s)}`);
+  });
+  const sum = $('[data-t="sum"]');
+  const sumH = `Runtime <b>${fmtDur((p.end - startMs()) / 1000)}</b> · finish <b>${hm(p.end)}</b>${st === 'live' ? ` · expected <b>${hm(ex.end)}</b>` : ''}`;
+  if (sum && sum._h !== sumH) { sum._h = sumH; sum.innerHTML = sumH; }
+  let over = false, warn = false;
+  if (show.live.hold) {  // the hold timer covers everything: same countdown rules as a segment
+    const h = show.live.hold, left = (h.at + h.dur * 1000 - now) / 1000;
+    over = left < 0; warn = !over && left <= Math.min(120, h.dur * .25);
+    setT('count', over ? (R.view === 'timer' ? '0:00' : '+' + fmtDur(Math.floor(-left))) : fmtDur(Math.ceil(left - 1e-6)));
+    setT('sub', `Adhoc · ${over ? 'over' : 'left'} of ${fmtDur(h.dur)} · started ${hm(h.at)}`);
+    $$('[data-t="prog"]').forEach(b => b.style.width = Math.min(100, Math.max(0, 1 - Math.max(left, 0) / h.dur) * 100) + '%');
+  } else if (st === 'live' && isFree(show.items[liveIdx()])) {  // free time: the time of day, never red
+    const it = show.items[liveIdx()];
+    setT('count', hms(now)); setT('sub', it.until ? `Free time · next cue ${it.until}` : 'Free time · next cue when ready');
+    $$('[data-t="prog"]').forEach(b => b.style.width = '0%');
+  } else if (st === 'live') {
+    const l = show.live, it = show.items[liveIdx()], shownTotal = it.dur + (l.nudge || 0), rem = shownLeft(now), rr = realLeft(now);
+    over = rr < 0; warn = !over && rem <= Math.min(120, shownTotal * .25);
+    // Countdown rounding: 10:00 shows for the whole first second and 0:00 lands exactly at the end; overrun counts whole seconds.
+    // The speaker clock stops at 0:00 and goes red, so a presenter never sees how far over they are. Call and Crew count on.
+    setT('count', over ? (R.view === 'timer' ? '0:00' : '+' + fmtDur(Math.floor(-rr))) : fmtDur(Math.ceil(rem - 1e-6)));
+    // Crew and speakers see only the countdown. Time travel lives in the caller's own row, and only while it can still help.
+    setT('sub', `${over ? 'over' : 'left'} of ${fmtDur(shownTotal)} · started ${hm(l.at)}`);
+    setT('ttEnd', hm(curEnd()));
+    $$('.tt').forEach(e => e.classList.toggle('is-over', over));  // nothing left to bend once it's over: grey out, don't move
+    $$('.tt input, .tt button').forEach(x => x.disabled = over);
+    $$('[data-t="prog"]').forEach(b => b.style.width = Math.min(100, Math.max(0, 1 - Math.max(rem, 0) / (shownTotal || 1)) * 100) + '%');
+  }
+  $$('[data-t="count"]').forEach(c => c.classList.toggle('long', c.textContent.length > 6));  // h:mm:ss and 10:09:33 must still fit
+  document.body.classList.toggle('t-over', over); document.body.classList.toggle('t-warn', warn);
+}
+setInterval(tick, 250);  // four looks a second, so a slow device never skips or sticks on a number
+
+/* ---------- actions */
+const rowOf = el => show.items[+el.closest('[data-i]').dataset.i];
+const ACT = {
+  async logout() { await api('/api/logout', {method:'POST', body:'{}'}).catch(() => {}); me = null; isAdmin = false; store.set('me', null); store.set('admin', false); viewLogin(); },
+  userEdit(b) {  // fills the form with this login, to change its password or admin rights
+    $('#u-name').value = b.dataset.name; $('#u-name').readOnly = true; $('#u-admin').checked = !!b.dataset.admin;
+    $('#u-pass').value = ''; $('#u-pass').placeholder = 'Leave empty to keep their password';
+    $('#u-go').textContent = 'Save changes'; $('#u-cancel').hidden = false;
+    $('#u-help').textContent = "A new password logs them out on every device, so they'll need to log in again.";
+    $('#u-pass').focus();
+  },
+  userNew() { viewAdmin(); },
+  async userDel(b) {
+    if (!confirm(`Remove the login "${b.dataset.name}"? They'll be logged out straight away.`)) return;
+    const r = await api(`/api/users/${encodeURIComponent(b.dataset.name)}`, {method:'DELETE'}).catch(() => null);
+    if (!r?.ok) return toast(r?.data?.error || 'ShowPace cannot reach the server');
+    toast('Removed'); viewAdmin();
+  },
+  lookReset() { $('#st-brand').value = '#1f8f4e'; $('#st-bg').value = '#101211'; toast('Press Save settings to keep these'); },
+  newShow() { const f = $('#new'); f.hidden = !f.hidden; if (!f.hidden) $('#n-title').focus(); },
+  importFile() { $('#file').click(); },
+  async crewPage() {
+    const url = `${location.origin}/crew`;
+    try { await navigator.clipboard.writeText(url); toast('Crew page link copied'); } catch { prompt('Crew page: send this to the crew', url); }
+  },
+  async pushLive() {  // always asks for a crew password; empty means straight in
+    let body;
+    if (show.onCrew) {
+      if (!confirm('Take this show off the crew page? Anyone already watching keeps their view.')) return;
+      body = {on:false};
+    } else {
+      const pw = prompt('Push live to the crew page.\n\nCrew password (leave empty to let crew straight in):', '');
+      if (pw === null) return;
+      body = {on:true, pass:pw};
+    }
+    try {
+      const r = await api(`/api/shows/${show.id}/crew`, {method:'POST', body:JSON.stringify(body)});
+      if (!r.ok) throw Error();
+      Object.assign(show, r.data); cachePut(); render();
+      toast(!show.onCrew ? 'Taken off the crew page' : show.crewLocked ? 'Live on the crew page, with a password' : 'Live on the crew page, straight in');
+    } catch { toast('Could not reach the server. Try again when you are online.'); }
+  },
+  async archive(b) {
+    const r = await api(`/api/shows/${b.dataset.id}`);
+    if (!r.ok) return toast('Could not reach the server');
+    r.data.archived = !r.data.archived;
+    await api(`/api/shows/${b.dataset.id}`, {method:'PUT', body:JSON.stringify(r.data)});
+    viewShows();
+  },
+  async deleteShow(b) {
+    if (!confirm(`Delete "${b.dataset.title || 'this show'}" for good? Its running order, crew link and crew password all go.`)) return;
+    const r = await api(`/api/shows/${b.dataset.id}`, {method:'DELETE'}).catch(() => null);
+    toast(r?.ok ? 'Show deleted' : r?.data?.error || 'Could not reach the server');
+    viewShows();
+  },
+  async remote() {  // show the QR for the phone remote, setting a remote password first if there isn't one
+    if (!show.remoteOn && !(await setRemotePass())) return;
+    if (!window.qrcode) await new Promise((ok, no) => document.head.append(Object.assign(document.createElement('script'), {src:'/qrcode.min.js', onload:ok, onerror:no})));
+    const url = `${location.origin}/r/${show.viewToken}`, qr = qrcode(0, 'M');
+    qr.addData(url); qr.make();
+    document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="qr-modal"><div class="modal-card"><div class="lab">Caller remote</div><h2>${esc(show.title || 'Untitled show')}</h2>
+      <div class="qr">${qr.createSvgTag({cellSize:6, margin:2, scalable:true})}</div>
+      <p>Scan with the phone camera, then type the remote password.</p><code>${esc(url)}</code>
+      <div class="row"><button data-a="copyRemote" data-url="${esc(url)}">Copy link</button><button class="primary" data-a="closeQr">Done</button></div></div></div>`);
+  },
+  async remotePass() { if (await setRemotePass()) toast('New remote password set. Phones using the old one are locked out.'); },
+  closeQr() { $('#qr-modal')?.remove(); },
+  async copyRemote(b) { try { await navigator.clipboard.writeText(b.dataset.url); toast('Remote link copied'); } catch { prompt('Caller remote link', b.dataset.url); } },
+  async copyLink(b) {
+    const url = `${location.origin}/v/${b.dataset.token || show.viewToken}`;
+    try { await navigator.clipboard.writeText(url); toast('Crew link copied'); } catch { prompt('Crew link: send this to the crew', url); }
+  },
+  mode(b) { simple = b.dataset.v === '1'; store.set('simple', simple); render(); },
+  start() { const l = show.live; l.id = show.items[nextIdx(-1)].id; l.at = nowMs(); l.log = []; fresh(l); save(); render(); },
+  complete() {
+    const l = show.live, now = nowMs();
+    l.log.push({id:l.id, start:l.at, end:now, ...bend(l)});
+    l.id = show.items[nextIdx(liveIdx())]?.id ?? 'END'; l.at = now; fresh(l);
+    save(); render();
+  },
+  back() {
+    const l = show.live, last = l.log.pop();
+    if (last) Object.assign(l, {id:last.id, at:last.start, ...bend(last), hold:null}); else { l.id = null; l.at = null; fresh(l); }
+    save(); render();
+  },
+  nudge(b) { shift(+b.dataset.s, false); },
+  holdPick(b) { holdMins = b.dataset.m; render(); },  // picks the time; play starts it
+  hold() {
+    const m = +holdMins;
+    if (!(m > 0 && m <= 600)) return toast('Pick or type the minutes first');
+    show.live.hold = {at:nowMs(), dur:Math.round(m * 60)}; holdMins = ''; save(); render();
+  },
+  holdOff() { show.live.hold = null; save(); render(); },
+  ttGo() {
+    if (ttTarget == null || Math.abs(ttTarget - curEnd()) < 1000) return toast('Set a new end time or minutes saved first');
+    shift((ttTarget - curEnd()) / 1000, true); ttTarget = null; render();
+  },
+  ttOff() { shift(-(show.live.travel || 0), true); ttTarget = null; render(); },
+  goto(b) {  // two taps, so a stray touch can't jump the show
+    if (!b.dataset.arm) { b.dataset.arm = 1; b.textContent = 'Go?'; setTimeout(() => { delete b.dataset.arm; b.textContent = 'Go'; }, 3000); return; }
+    const l = show.live, now = nowMs();
+    if (state() === 'live') l.log.push({id:l.id, start:l.at, end:now, ...bend(l)});
+    else if (state() !== 'done') l.log = [];
+    l.id = rowOf(b).id; l.at = now; fresh(l);
+    save(); render();
+  },
+  reset() { if (confirm('Reset the show? This clears the live progress, not the running order.')) { show.live = {id:null, at:null, log:[]}; save(); render(); } },
+  addRow() { show.items.push(blank()); save(); render(); $('#grid tbody tr:last-child textarea[data-f="title"]')?.focus(); },
+  addHeader() { show.items.push({id:uid(), type:'header', title:''}); save(); render(); $('#grid tbody tr:last-child input')?.focus(); },
+  rowUp(b) { move(b, -1); }, rowDown(b) { move(b, 1); },
+  rowIns(b) {
+    const i = +b.closest('[data-i]').dataset.i;
+    show.items.splice(i + 1, 0, blank()); save(); render();
+    $(`#grid tr[data-i="${i + 1}"] textarea[data-f="title"]`)?.focus();
+  },
+  rowDel(b) {
+    const i = +b.closest('[data-i]').dataset.i, it = show.items[i];
+    if (!confirm(`Remove "${it.title || (isH(it) ? 'this section' : 'this segment')}"?`)) return;
+    if (it.id === show.live.id) { show.live.id = show.items[nextIdx(i)]?.id ?? 'END'; show.live.at = nowMs(); fresh(show.live); }
+    show.items.splice(i, 1); save(); render();
+  },
+  export() {  // the same columns as the template, so a download can be edited in Excel and uploaded again
+    const p = planned(), cell = v => /[",\n]/.test(v = String(v ?? '')) ? `"${v.replace(/"/g, '""')}"` : v;
+    const rows = [['Cue', 'Start', 'End', 'Duration (mins)', 'Segment', 'Type', 'Who', 'Audio', 'Lighting', 'Video', 'Notes'],
+      ...show.items.map((it, k) => isH(it) ? ['', '', '', '', it.title, 'Section']
+        : [it.cue, hm(p.starts[k]), isFree(it) ? it.until || '' : hm(p.starts[k] + it.dur * 1000), isFree(it) ? '' : +(it.dur / 60).toFixed(2), it.title, kindOf(it) ? KINDS[kindOf(it)] : '', it.who, it.audio, it.lx, it.vid, it.notes])];
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], {type:'text/csv'}));  // BOM so Excel reads £ and accents
+    a.download = `${(show.title || 'show').replace(/[^\w -]+/g, '').trim() || 'show'}.csv`;
+    a.click(); URL.revokeObjectURL(a.href);
+  },
+  print() { window.print(); },
+  fullscreen() {  // toggles; older iPad Safari only has the webkit-prefixed versions
+    const el = document.documentElement, d = document;
+    try {
+      const go = isFull() ? (d.exitFullscreen || d.webkitExitFullscreen).call(d) : (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+      go?.catch?.(() => {});
+    } catch {}
+  },
+};
+async function setRemotePass() {  // a remote password of its own, separate from crew passwords and logins
+  const pw = prompt('Caller remote password.\n\nAnyone with this and the QR can press Start, Complete and Back from a phone. A new password locks out phones using the old one.', '');
+  if (!pw) { if (pw === '' && show.remoteOn && confirm('Switch the caller remote off?')) await sendRemote(''); return false; }
+  return sendRemote(pw);
+}
+async function sendRemote(pass) {
+  const r = await api(`/api/shows/${show.id}/remote`, {method:'POST', body:JSON.stringify({pass})}).catch(() => null);
+  if (!r?.ok) { toast('Could not reach the server'); return false; }
+  show.remoteOn = r.data.remoteOn; cachePut(); render();
+  return show.remoteOn;
+}
+// ±1m: the countdown jumps. Time travel: the real end moves, and the speaker's countdown speeds up or slows down to meet it.
+function shift(s, travel) {
+  if (isFree(show.items[liveIdx()])) return toast('Free time has no countdown');
+  const l = show.live, now = nowMs(), shown = shownLeft(now), left = realLeft(now);
+  if (left <= 0) return toast('This segment is already over time');
+  if (s < 0 && left <= 10) return toast('Less than 10 seconds left');
+  if (s < 0) s = Math.max(s, 10 - left);  // always leave at least 10 seconds
+  const k = travel ? 'travel' : 'nudge';
+  l[k] = (l[k] || 0) + s;
+  if (travel || l.tt) l.tt = {d0:travel ? shown : shown + s, r0:realLeft(now)};
+  save(); tick();
+}
+const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+// Esc, the iPad's own close button, or ours: keep the label honest whichever way full screen ends.
+for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, () => setT('fs', isFull() ? 'Exit full screen' : 'Full screen'));
+function move(b, d) {
+  const L = show.items, i = +b.closest('[data-i]').dataset.i, it = L[i], act = b.dataset.a, before = b.getBoundingClientRect().top;
+  // A heading moves on its own, one row at a time, like any row. (Carrying its rows along reversed them.)
+  const j = i + d; if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]];
+  save(); render();
+  // Keep the moved row under the pointer, so pressing again moves the same row again.
+  const nb = $(`#grid tr[data-id="${CSS.escape(it.id)}"] [data-a="${act}"]`);
+  if (nb) { $('.grid-wrap').scrollTop += nb.getBoundingClientRect().top - before; nb.focus({preventScroll:true}); }
+}
+const LIVE_ACTS = new Set(['start', 'complete', 'back']);
+let lastLive = 0;
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-a]');
+  $$('details.crew-menu[open]').forEach(d => { if (b || !d.contains(e.target)) d.open = false; });
+  if (!b || !ACT[b.dataset.a]) return;
+  e.preventDefault();
+  // A double-click or double-tap on Start, Complete or Back counts once, so it can't skip a segment
+  if (LIVE_ACTS.has(b.dataset.a)) { if (Date.now() - lastLive < 1500) return; lastLive = Date.now(); }
+  ACT[b.dataset.a](b);
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'hold-m') { holdMins = e.target.value; return $$('.hold .sel').forEach(x => x.classList.remove('sel')); }
+  if (e.target.id === 'tt-end' || e.target.id === 'tt-save') return ttSync(e.target.id === 'tt-end' ? 'end' : 'save');  // Call and the remote
+  if (!canEdit() || !show) return;
+  if (e.target.dataset.until) { show.items[+e.target.dataset.until].until = e.target.value; save(); return tick(); }
+  const f = e.target.dataset.f, m = e.target.dataset.m;
+  if (m) { show[m] = e.target.value; save(); if (m === 'title') $('.show-name b').textContent = e.target.value || 'Untitled show'; return tick(); }
+  if (!f || f === 'dur') return;
+  rowOf(e.target)[f] = e.target.value;
+  save();
+  if (f === 'kind') render();  // Free changes the row's cells
+});
+document.addEventListener('change', e => {
+  if (!canEdit() || e.target.dataset.f !== 'dur') return;
+  const it = rowOf(e.target), d = parseDur(e.target.value);
+  if (d != null) it.dur = d;
+  e.target.value = fmtDur(it.dur); save(); tick();
+});
+
+// Keep the screen on wherever someone might be watching a show (before Start too); let it sleep in Edit and Shows.
+// A page can only ask. On a stage iPad, also set Auto-Lock to Never in Settings.
+let lock = null;
+async function wake() {
+  try {
+    const want = ['call', 'crew', 'timer', 'remote'].includes(R.view) && show && document.visibilityState === 'visible';
+    if (want && !lock) { lock = await navigator.wakeLock?.request('screen'); lock?.addEventListener('release', () => lock = null); }
+    if (!want && lock) { lock.release(); lock = null; }
+  } catch {}
+}
+document.addEventListener('visibilitychange', wake);
+
+/* ---------- router */
+applyBrand(store.get('brand'));  // last known look straight away, then the server's
+const brandReady = fetch('/api/brand').then(r => r.json()).then(applyBrand).catch(() => {});
+async function go() {
+  await brandReady;
+  R = route();
+  if (R.view === 'crewlist') { closeShow(); return viewCrewList(); }
+  if (R.view === 'shows' || R.view === 'admin') {
+    closeShow(); document.body.dataset.view = 'shows';
+    if (await ensureMe()) R.view === 'admin' ? viewAdmin() : viewShows();
+    return;
+  }
+  if (!R.token && !(await ensureMe())) return;
+  if (sid !== (R.token ? 'v:' + R.token : R.id) && !(await openShow())) return;
+  render();
+}
+addEventListener('hashchange', go);
+addEventListener('online', () => dirty && push());
+go();
+
+// Open any ShowPace page with ?selftest to check the time maths.
+if (location.search.includes('selftest')) {
+  const ok = (c, m) => { if (!c) throw Error('selftest: ' + m); };
+  ok(parseDur('5') === 300 && parseDur('5:30') === 330 && parseDur('1:00:05') === 3605 && parseDur('abc') === null, 'parseDur');
+  ok(fmtDur(330) === '5:30' && fmtDur(3605) === '1:00:05' && fmtDur(-75) === '1:15', 'fmtDur');
+  const keep = show, t0 = new Date('2026-11-04T19:00').getTime();
+  show = {date:'2026-11-04', start:'19:00', items:[{id:'h', type:'header'}, {id:'a', dur:600}, {id:'b', dur:300}], live:{id:'a', at:t0 + 120e3, log:[]}};
+  ok(planned().end === t0 + 900e3, 'planned end, headers take no time');
+  ok(expected(t0 + 5 * 60e3).starts[2] === t0 + 12 * 60e3, 'late start pushes next');
+  ok(expected(t0 + 20 * 60e3).starts[2] === t0 + 20 * 60e3, 'overrun pushes next to now');
+  show.live.nudge = 60;
+  ok(expected(t0 + 5 * 60e3).starts[2] === t0 + 13 * 60e3, '+1m pushes next');
+  ok(drift(t0 + 5 * 60e3)[1] === 'over', 'drift over');
+  // 10:00 segment, time travel −1m at the start: it really ends after 9:00, and the speaker sees 5:00 at 4:30
+  show.live = {id:'a', at:t0, log:[], nudge:0, travel:-60, tt:{d0:600, r0:540}};
+  ok(Math.round(shownLeft(t0 + 270e3)) === 300, 'time travel runs the countdown fast');
+  ok(Math.round(realLeft(t0 + 540e3)) === 0 && expected(t0).starts[2] === t0 + 540e3, 'time travel saves the minute');
+  ok(Math.round(shownLeft(t0 + 600e3)) === -60, 'after the real end it counts over in real seconds');
+  // free time anchors the next cue, absorbs an earlier overrun, and pushes on if it runs past its time
+  show = {date:'2026-11-04', start:'09:00', items:[{id:'a', dur:600}, {id:'f', kind:'free', until:'10:00', dur:0}, {id:'b', dur:300}], live:{id:null, at:null, log:[]}};
+  const t9 = new Date('2026-11-04T09:00').getTime();
+  ok(planned().starts[2] === t9 + 3600e3 && planned().end === t9 + 3900e3, 'free runs until its time');
+  show.live = {id:'f', at:t9 + 1500e3, log:[{id:'a', start:t9, end:t9 + 1500e3}]};
+  ok(expected(t9 + 1800e3).starts[2] === t9 + 3600e3, 'an earlier overrun is absorbed');
+  ok(expected(t9 + 3900e3).starts[2] === t9 + 3900e3, 'running past the time pushes on');
+  show = keep;
+  console.log('selftest passed');
+}
+</script>
+</body>
+</html>
