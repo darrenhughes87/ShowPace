@@ -223,6 +223,7 @@ a.crew-card:hover{border-color:var(--brand3)}
 .timer h2{font:400 var(--h2)/1.2 var(--display);margin:8px 0 2px;text-wrap:balance;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
 .timer .who{margin:0;opacity:.8;font-size:13px;height:1.4em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .count{font:700 clamp(64px,9vw,104px)/1 var(--body);font-variant-numeric:tabular-nums;letter-spacing:-.03em;margin:16px 0 4px;height:clamp(64px,9vw,104px);display:flex;align-items:center}
+.count.plus::before{content:'+';font-size:.5em;margin-right:.08em;opacity:.85}
 .t-warn .count{color:#ffc27d}
 .t-warn .timer.is-live{background:linear-gradient(118deg,var(--warn-bg) 0 70%,var(--warn-bg2) 70%);color:#fff}.t-warn .timer.is-live .count{color:#fff}
 .count.long{font-size:clamp(44px,5.6vw,72px)}  /* an hour or more: h:mm:ss must still fit */
@@ -1039,7 +1040,7 @@ function tick() {
   if (show.live.hold) {  // the hold timer covers everything: same countdown rules as a segment
     const h = show.live.hold, left = (h.at + h.dur * 1000 - now) / 1000;
     over = left < 0; warn = !over && left <= Math.min(120, h.dur * .25);
-    setT('count', over ? (R.view === 'timer' ? '0:00' : '+' + fmtDur(Math.floor(-left))) : fmtDur(Math.ceil(left - 1e-6)));
+    setT('count', over ? (R.view === 'timer' ? '0:00' : fmtDur(Math.floor(-left))) : fmtDur(Math.ceil(left - 1e-6)));
     setT('sub', `Adhoc · ${over ? 'over' : 'left'} of ${fmtDur(h.dur)} · started ${hm(h.at)}`);
     $$('[data-t="prog"]').forEach(b => b.style.width = Math.min(100, Math.max(0, 1 - Math.max(left, 0) / h.dur) * 100) + '%');
   } else if (st === 'live' && isFree(show.items[liveIdx()])) {  // free time: the time of day, never red
@@ -1051,7 +1052,7 @@ function tick() {
     over = rr < 0; warn = !over && rem <= Math.min(120, shownTotal * .25);
     // Countdown rounding: 10:00 shows for the whole first second and 0:00 lands exactly at the end; overrun counts whole seconds.
     // The speaker clock stops at 0:00 and goes red, so a presenter never sees how far over they are. Call and Crew count on.
-    setT('count', over ? (R.view === 'timer' ? '0:00' : '+' + fmtDur(Math.floor(-rr))) : fmtDur(Math.ceil(rem - 1e-6)));
+    setT('count', over ? (R.view === 'timer' ? '0:00' : fmtDur(Math.floor(-rr))) : fmtDur(Math.ceil(rem - 1e-6)));
     // Crew and speakers see only the countdown. Time travel lives in the caller's own row, and only while it can still help.
     setT('sub', `${over ? 'over' : 'left'} of ${fmtDur(shownTotal)} · started ${hm(l.at)}`);
     setT('ttEnd', hm(curEnd()));
@@ -1059,7 +1060,8 @@ function tick() {
     $$('.tt input, .tt button').forEach(x => x.disabled = over);
     $$('[data-t="prog"]').forEach(b => b.style.width = Math.min(100, Math.max(0, 1 - Math.max(rem, 0) / (shownTotal || 1)) * 100) + '%');
   }
-  $$('[data-t="count"]').forEach(c => c.classList.toggle('long', c.textContent.length > 6));  // h:mm:ss and 10:09:33 must still fit
+  // Over time on Call and Crew: a small + before the time (drawn by CSS, so it never outshouts the digits). h:mm:ss must still fit.
+  $$('[data-t="count"]').forEach(c => { c.classList.toggle('plus', over && R.view !== 'timer'); c.classList.toggle('long', c.textContent.length > 6); });
   document.body.classList.toggle('t-over', over); document.body.classList.toggle('t-warn', warn);
 }
 setInterval(tick, 250);  // four looks a second, so a slow device never skips or sticks on a number
