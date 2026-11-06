@@ -221,7 +221,9 @@ def clean_live(l):
            for e in l.get('log') if isinstance(e, dict) and seg(e.get('id'))][:2000] if isinstance(l.get('log'), list) else []
     h = l.get('hold')  # the hold timer: {at, dur in seconds}, off the schedule
     hold = {'at': num(h.get('at')), 'dur': num(h.get('dur'))} if isinstance(h, dict) and num(h.get('at')) and num(h.get('dur')) else None
-    return {'id': seg(l.get('id')), 'at': num(l.get('at')), **bend(l), 'hold': hold, 'log': log}
+    m = l.get('msg')  # a message on the speaker's clock: {text, at}; at changes to flash it again
+    msg = {'text': ' '.join(m['text'].split())[:80], 'at': num(m.get('at'))} if isinstance(m, dict) and isinstance(m.get('text'), str) and m['text'].strip() and num(m.get('at')) else None
+    return {'id': seg(l.get('id')), 'at': num(l.get('at')), **bend(l), 'hold': hold, 'msg': msg, 'log': log}
 
 
 # ---- Importing a running order from CSV or Excel

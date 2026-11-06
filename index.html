@@ -198,7 +198,22 @@ a.crew-card:hover{border-color:var(--brand3)}
 .timer{--h2:22px;position:relative;overflow:hidden;border-radius:14px;padding:18px;border:1px solid transparent;color:var(--on-brand);background:linear-gradient(118deg,var(--brand) 0 70%,var(--brand2) 70%)}
 .t-over .timer.is-live{background:linear-gradient(118deg,var(--bad-bg) 0 70%,var(--bad-bg2) 70%)}
 .timer.idle{background:var(--panel);border:1px solid var(--line);color:var(--fg)}
-.timer .lab{color:inherit;opacity:.75}
+.timer .lab{color:inherit;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:1.4em}
+/* A message on the speaker's clock: shown in the Now line on Call, Crew and the remote, so nothing moves */
+.timer .lab.has-msg{opacity:1}
+.msg-on{background:#ffd400;color:#111;border-radius:4px;padding:0 6px;text-transform:none;letter-spacing:0}
+.msg-x{background:none;border:0;padding:0 5px;margin:0;font:inherit;line-height:inherit;color:inherit;cursor:pointer}
+.msg-dlg{background:var(--panel);color:var(--fg);border:1px solid var(--line2);border-radius:14px;padding:18px;width:min(440px,92vw)}
+.msg-dlg::backdrop{background:rgba(0,0,0,.6)}
+.msg-dlg form{display:grid;gap:12px}
+.msg-pre{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.msg-pre button{min-height:44px}
+.msg-dlg input{background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:10px 11px;font-size:16px}
+.msg-acts{display:flex;gap:8px;justify-content:flex-end}
+.msg-acts .primary{min-width:90px}
+.msg-btn{width:100%;min-height:44px;margin-top:10px}
+@keyframes msgflash{50%{opacity:.1}}
+.flash{animation:msgflash .5s step-end 3}
 .t-over .timer.is-live{color:#fff}
 .timer.idle .lab{color:var(--muted)}
 /* Fixed slots so the card never changes height: three lines of title, one of who, one countdown height */
@@ -321,6 +336,7 @@ body[data-view="timer"] .top{display:none}
 .tv-mid{display:grid;align-content:center;gap:2vh}
 .tv-title{font:400 5vh/1.15 var(--display);color:#ddd;height:2.3em;display:flex;align-items:flex-end;justify-content:center}  /* always two lines tall, so the digits never move */
 .tv-title span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tv-title .tv-msg{background:#ffd400;color:#111;font-weight:700;border-radius:.2em;padding:0 .4em}  /* same two-line space as the title */
 .tv .count{font-size:min(34vh,26vw);height:min(34vh,26vw);justify-content:center;margin:0;letter-spacing:-.04em}
 .tv .prog{height:2.2vh;border-radius:1.1vh;background:#222}
 .tv-next{font-size:3vh;line-height:1.3;height:1.3em;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -534,7 +550,7 @@ function shownLeft(now) {
   const rr = realLeft(now), tt = show.live.tt;
   return !tt || rr <= 0 ? rr : tt.d0 * rr / tt.r0;
 }
-const fresh = l => { l.nudge = 0; l.travel = 0; l.tt = null; l.hold = null; };
+const fresh = l => { l.nudge = 0; l.travel = 0; l.tt = null; l.hold = null; l.msg = null; };
 const bend = l => ({nudge:l.nudge || 0, travel:l.travel || 0, tt:l.tt || null});  // kept in the log so Back can restore it
 // Free: no countdown. It runs until its 'until' time (edited as the next cue's Start), which anchors everything after it.
 const isFree = it => it?.kind === 'free';
@@ -584,6 +600,7 @@ function topShow() {
       <details class="crew-menu"><summary class="btn${show.onCrew ? ' on' : ''}">${show.onCrew ? 'Live to crew' : 'Crew'} ▾</summary>
         <div class="menu"><p>${show.onCrew ? `On the crew page${show.crewLocked ? ', with a password' : ', crew go straight in'}.` : 'Not on the crew page yet. Push live to list it there.'}</p>
           <button data-a="pushLive" class="${show.onCrew ? '' : 'primary'}">${show.onCrew ? 'Take off the crew page' : 'Push live'}</button>
+          <button data-a="message">Message the speaker</button>
           <button data-a="copyLink">Copy this show's crew link</button><button data-a="crewPage">Copy crew page link</button>
           <button data-a="remote">${show.remoteOn ? 'Caller remote: show QR' : 'Set up caller remote'}</button>${show.remoteOn ? '<button data-a="remotePass">New remote password</button>' : ''}</div></details>`}</div>`;
   syncChip();
@@ -592,10 +609,18 @@ const techGrid = it => {
   const f = it ? TECH.filter(([k]) => it[k]) : [];
   return f.length ? `<dl class="tech">${f.map(([k, h]) => `<div><dt>${h}</dt><dd>${esc(it[k])}</dd></div>`).join('')}</dl>` : '';
 };
+// The message on the speaker's clock, in the Now line. Whoever can call the show gets a ✕ to clear it.
+const msgFresh = () => nowMs() - (show.live.msg?.at || 0) < 2500;  // flash only when it's just been sent, not on every redraw
+function msgChip() {
+  const m = show.live.msg;
+  if (!m) return '';
+  const x = canEdit() || remoteKey() ? '<button class="msg-x" data-a="msgClear" title="Take the message off the clock" aria-label="Clear the message">✕</button>' : '';
+  return ` · <span class="msg-on${msgFresh() ? ' flash' : ''}">${esc(m.text)}</span>${x}`;
+}
 function timerCard(withTech) {
   const st = state(), i = liveIdx();
   // Same slots in every state, so the card is always the same height
-  const slots = (cls, lab, h2, who, count, sub, prog, extra = '') => `<section class="timer ${cls}"><div class="lab">${lab}</div><div class="head"><h2>${h2}</h2><p class="who">${who}</p></div>
+  const slots = (cls, lab, h2, who, count, sub, prog, extra = '') => `<section class="timer ${cls}"><div class="lab${show.live.msg ? ' has-msg' : ''}">${lab}${msgChip()}</div><div class="head"><h2>${h2}</h2><p class="who">${who}</p></div>
     <div class="count" data-t="count">${count}</div><p class="sub" data-t="sub">${sub}</p><div class="prog"><i data-t="prog" style="width:${prog}%"></i></div>${extra}</section>`;
   if (st === 'empty') return slots('idle', 'Nothing to run yet', 'Add segments in Edit', '', '0:00', '', 0);
   // Holding (crew arriving) and Thank you (show over): the event name and the time of day, then the countdown takes over
@@ -915,12 +940,13 @@ function viewCrew() {
 function viewTimer() {
   const st = state(), i = liveIdx(), live = st === 'live', nx = show.items[live ? nextIdx(i) : -1], hold = show.live.hold;
   const counts = hold || live && !isFree(show.items[i]);
-  const title = hold ? '' : live ? esc(show.items[i].title) : st === 'done' ? 'Thank you' : esc(show.title || '');
+  const msg = show.live.msg;
+  const title = msg ? `<span class="tv-msg${msgFresh() ? ' flash' : ''}">${esc(msg.text)}</span>` : hold ? '' : live ? esc(show.items[i].title) : st === 'done' ? 'Thank you' : esc(show.title || '');
   const back = R.token ? '#crew' : `#s/${show.id}/call`;
   $('#top').innerHTML = '';
   $('#app').innerHTML = `<section class="tv">
     <div class="tv-top"><span data-t="clock"></span><span class="ctl">${document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen ? `<button data-a="fullscreen" data-t="fs">${isFull() ? 'Exit full screen' : 'Full screen'}</button>` : ''}<a class="btn" href="${back}">Back</a></span></div>
-    <div class="tv-mid"><div class="tv-title"><span>${title}</span></div>
+    <div class="tv-mid"><div class="tv-title">${msg ? title : `<span>${title}</span>`}</div>
       <div class="count" data-t="count">${hold ? fmtDur(hold.dur) : counts ? fmtDur(show.items[i].dur) : hms(nowMs())}</div><div class="prog"${counts ? '' : ' style="visibility:hidden"'}><i data-t="prog"></i></div></div>
     <div class="tv-next">${nx ? 'Next: ' + esc(nx.title) : ''}</div><div></div>
   </section>`;
@@ -945,7 +971,7 @@ function viewRemote() {
   }
   $('#app').innerHTML = `<section class="remote wrap">${timerCard(false)}
     <div class="r-next"><div class="lab">${st === 'ready' ? 'Up first' : 'Next'}${nx ? ` · <span data-exp="${idx(nx.id)}"></span>` : ''}</div>${nx ? esc(nx.title || 'Untitled') : 'End of show'}</div>
-    ${callControls()}${timeTravel()}${holdPanel()}${statsHtml()}</section>`;
+    ${callControls()}${timeTravel()}${holdPanel()}<button class="msg-btn" data-a="message">Message the speaker</button>${statsHtml()}</section>`;
 }
 
 // Redraws keep your place: the page and every scrolling panel stay where you left them.
@@ -1111,7 +1137,7 @@ const ACT = {
   },
   back() {
     const l = show.live, last = l.log.pop();
-    if (last) Object.assign(l, {id:last.id, at:last.start, ...bend(last), hold:null}); else { l.id = null; l.at = null; fresh(l); }
+    if (last) Object.assign(l, {id:last.id, at:last.start, ...bend(last), hold:null, msg:null}); else { l.id = null; l.at = null; fresh(l); }
     save(); render();
   },
   nudge(b) { shift(+b.dataset.s, false); },
@@ -1122,6 +1148,27 @@ const ACT = {
     show.live.hold = {at:nowMs(), dur:Math.round(m * 60)}; holdMins = ''; save(); render();
   },
   holdOff() { show.live.hold = null; save(); render(); },
+  message() {  // a pop-up over everything, so nothing on the screen moves
+    $('#msg-dlg')?.remove();
+    const m = show.live.msg;
+    document.body.insertAdjacentHTML('beforeend', `<dialog id="msg-dlg" class="msg-dlg"><form id="msg-form">
+      <div class="lab">Message the speaker</div>
+      <div class="msg-pre">${['Wrap up', 'Speak up', 'Slow down', 'Questions now'].map(p => `<button type="button" data-a="msgPick" data-p="${p}">${p}</button>`).join('')}</div>
+      <input id="msg-text" maxlength="60" placeholder="Or type your own" autocomplete="off" value="${esc(m?.text || '')}" aria-label="Message">
+      <div class="msg-acts"><button type="button" data-a="msgClose">Close</button>${m ? '<button type="button" data-a="msgClear">Clear</button><button type="button" data-a="msgFlash">Flash</button>' : ''}<button class="primary">Send</button></div>
+    </form></dialog>`);
+    $('#msg-form').onsubmit = e => {
+      e.preventDefault();
+      const text = $('#msg-text').value.trim();
+      if (!text) return toast('Pick or type a message first');
+      show.live.msg = {text, at:nowMs()}; ACT.msgClose(); save(); render();
+    };
+    $('#msg-dlg').showModal();
+  },
+  msgPick(b) { $('#msg-text').value = b.dataset.p; $('#msg-text').focus(); },  // picks it; Send puts it up
+  msgFlash() { if (show.live.msg) { show.live.msg.at = nowMs(); ACT.msgClose(); save(); render(); } },
+  msgClear() { show.live.msg = null; ACT.msgClose(); save(); render(); },
+  msgClose() { $('#msg-dlg')?.close(); $('#msg-dlg')?.remove(); },
   ttGo() {
     if (ttTarget == null || Math.abs(ttTarget - curEnd()) < 1000) return toast('Set a new end time or minutes saved first');
     shift((ttTarget - curEnd()) / 1000, true); ttTarget = null; render();

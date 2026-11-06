@@ -172,9 +172,12 @@ assert call(f'/api/remote/{tok}/act', 'POST', {'key': key, 'live': {'id': None, 
 assert live()['log'] == [] and len(call(f'/api/view/{tok}')[2]['items']) == len(t['items']), 'the remote can only change the live state'
 assert press({'id': first}, 'not-the-key') == 403
 assert press({'id': first, 'at': '<b>', 'log': [None, 5, {'id': first, 'start': 1, 'end': 2, 'nudge': 60}], 'junk': 1}) == 200
-assert live() == {'id': first, 'at': None, 'nudge': 0, 'travel': 0, 'tt': None, 'hold': None, 'log': [{'id': first, 'start': 1, 'end': 2, 'nudge': 60, 'travel': 0, 'tt': None}]}, 'only known live fields get through'
+assert live() == {'id': first, 'at': None, 'nudge': 0, 'travel': 0, 'tt': None, 'hold': None, 'msg': None, 'log': [{'id': first, 'start': 1, 'end': 2, 'nudge': 60, 'travel': 0, 'tt': None}]}, 'only known live fields get through'
 assert press({'id': first, 'hold': {'at': 5000, 'dur': 600}}) == 200 and live()['hold'] == {'at': 5000, 'dur': 600}
 assert press({'id': first, 'hold': {'at': 'x', 'dur': 600}}) == 200 and live()['hold'] is None, 'a broken hold is dropped'
+assert press({'id': first, 'msg': {'text': '  Wrap   up ' + 'x' * 100, 'at': 7000}}) == 200 and live()['msg'] == {'text': 'Wrap up ' + 'x' * 72, 'at': 7000}
+assert press({'id': first, 'msg': {'text': '   ', 'at': 7000}}) == 200 and live()['msg'] is None, 'an empty message is dropped'
+assert press({'id': first, 'msg': {'text': 5, 'at': 1}}) == 200 and live()['msg'] is None
 assert press({'id': 'END'}) == 200 and live()['id'] == 'END'
 assert call(f'/api/remote/{tok}/act', 'POST', {'key': 'ünïcode', 'live': {}})[0] == 403
 shown = call(f'/api/shows/{sid_}', cookie=cookie)[2]

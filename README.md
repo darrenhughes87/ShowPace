@@ -12,6 +12,7 @@ You build the running order. On the day, you press **Complete** as each segment 
 - **Clock:** a big countdown for the speaker. It goes green, then orange, then red.
 - **Upload:** turn a spreadsheet (CSV or Excel) into a show.
 - **Caller remote:** run the show from your phone.
+- **Speaker messages:** send a short note to the speaker's clock, like Wrap up or Speak up. It shows where the title was, so the countdown never moves.
 
 There's nothing to install apart from Python. No database. Your shows are saved as files.
 
@@ -180,6 +181,7 @@ sudo docker compose logs
 4. **Make a show.** Press **New show**. Or press **Download template**, fill it in (Excel is fine), then **Upload running order**.
 5. **Run it.** Open the show and press **Call**. Press **Start show**, then **Complete** as each segment ends.
 6. **Share it.** From the **Crew** menu: a crew link, the speaker **Clock**, and the **caller remote** for your phone.
+7. **Talk to the speaker.** In the **Crew** menu, press **Message the speaker**. Pick one or type your own, then **Send**. It clears itself when you press Complete, or press ✕.
 
 **On a stage iPad:** in the iPad's Settings, set Auto-Lock to Never. In Safari, Share, then Add to Home Screen, opens ShowPace full screen.
 
