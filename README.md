@@ -182,6 +182,7 @@ sudo docker compose logs
 5. **Run it.** Open the show and press **Call**. Press **Start show**, then **Complete** as each segment ends.
 6. **Share it.** From the **Crew** menu: a crew link, the speaker **Clock**, and the **caller remote** for your phone.
    Crew links only show the show while it's live: press **Push live** in the Crew menu. Before that they say "This show isn't open yet". When you take it off (or archive it), every crew screen says "This show has finished". Push it live again and they come straight back.
+   Push live with a crew password and everyone has to type it, even people who already have the link. Push live again and they're asked again, so you can always shut someone out by changing the password.
 7. **Talk to the speaker.** In the **Crew** menu, press **Message the speaker**. Pick one or type your own, then **Send**. It clears itself when you press Complete, or press ✕.
 
 **On a stage iPad:** in the iPad's Settings, set Auto-Lock to Never. In Safari, Share, then Add to Home Screen, opens ShowPace full screen.

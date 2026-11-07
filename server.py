@@ -32,6 +32,7 @@ NAME = re.compile(r'^[a-z0-9._-]{2,32}$')
 MIN_PASS = 10
 TEXT = ('cue', 'title', 'who', 'kind', 'audio', 'lx', 'vid', 'notes', 'until')
 MAX_FAILS, FAIL_WINDOW = 10, 900   # wrong passwords per address per 15 minutes, then locked out
+COOKIE = 'showpace'
 MAX_VIEWERS = 300                    # live connections per show
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
        "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
@@ -382,6 +383,10 @@ def crew_state(s):
     return 'ended' if s.get('archived') or live.get('id') or live.get('log') else 'notyet'  # started at some point: it has finished
 
 
+def crew_pass(sid):
+    return read_json(os.path.join(DATA, 'crewpass.json'), {}).get(sid)
+
+
 def crew_list():
     """The /crew page: shows pushed live and not archived. Locked shows don't reveal their link."""
     out = []
@@ -472,6 +477,22 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def crew_ok(self, s):
+        """A show pushed live with a crew password only reaches browsers holding its current key. Every push live makes a
+        new key, so changing or adding a password always asks everyone again, even people who already had the link."""
+        if not s.get('crewLocked'):
+            return True
+        p = crew_pass(s['id']) or {}
+        m = re.search(r'(?:^|;\s*)%s_crew_%s=([A-Za-z0-9_-]+)' % (COOKIE, s['id']), self.headers.get('Cookie', ''))
+        return bool(m and p.get('key') and hmac.compare_digest(p['key'], m.group(1)))
+
+    def crew_cookie(self, s):
+        """After the right password: the show's current crew key, for this browser only."""
+        p = crew_pass(s['id']) or {}
+        if not (s.get('crewLocked') and p.get('key')):
+            return None
+        return f"{COOKIE}_crew_{s['id']}={p['key']}; Path=/; HttpOnly; SameSite=Lax; Max-Age={30 * 86400}" + ('; Secure' if SECURE else '')
+
     def by_token(self, token):
         return next((s for s in shows.values() if hmac.compare_digest(s.get('viewToken', ''), token)), None)
 
@@ -503,6 +524,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(404, {'error': 'This crew link is not valid'})
             if crew_state(s) != 'open':
                 return self.send_json(403, {'off': crew_state(s), 'title': s.get('title', '')})
+            if not self.crew_ok(s):
+                return self.send_json(403, {'locked': True, 'title': s.get('title', '')})
             return self.send_json(200, s)
         m = re.fullmatch(r'/api/events/(v/)?([A-Za-z0-9_-]+)', path)
         if m:
@@ -534,7 +557,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(400, {'error': 'Bad request'})
         sess_path = os.path.join(DATA, 'sessions.json')
         who = self.ip() + ' ' + path.split('/')[2]  # wrong passwords count per address and per kind: login, crew, remote
-        if path == '/api/login' or path == '/api/setup' or (path.startswith(('/api/crew/', '/api/remote/')) and not path.endswith('/act')):  # password routes only
+        if path == '/api/login' or path == '/api/setup' or (path.startswith(('/api/crew/', '/api/remote/', '/api/view/')) and not path.endswith('/act')):  # password routes only
             if locked_out(who):
                 return self.send_json(429, {'error': 'Too many wrong passwords. Wait 15 minutes and try again.'})
         if path == '/api/setup':  # first run only: the first login, always an admin
@@ -561,13 +584,14 @@ class Handler(SimpleHTTPRequestHandler):
                     write_json(sess_path, sess)
             return self.send_json(200, {}, 'showpace_session=; Path=/; Max-Age=0')
         crew_path = os.path.join(DATA, 'crewpass.json')  # kept out of the show file, which crew devices receive
-        m = re.fullmatch(r'/api/crew/([A-Za-z0-9_-]+)', path)
-        if m:
-            s, p = shows.get(m.group(1)), read_json(crew_path, {}).get(m.group(1))
-            if s and (s.get('archived') or not s.get('onCrew')):
+        m = re.fullmatch(r'/api/crew/([A-Za-z0-9_-]+)', path) or re.fullmatch(r'/api/view/([A-Za-z0-9_-]+)', path)
+        if m:  # the /crew page sends the show's id; a crew link sends its token
+            s = shows.get(m.group(1)) if path.startswith('/api/crew/') else self.by_token(m.group(1))
+            p = s and crew_pass(s['id'])
+            if s and crew_state(s) != 'open':
                 s = None
             if s and (not s.get('crewLocked') or (p and hmac.compare_digest(p['hash'], hash_pw(str(data.get('pass', '')), p['salt'])))):
-                return self.send_json(200, {'token': s['viewToken']})
+                return self.send_json(200, {'token': s['viewToken']}, self.crew_cookie(s))
             failed(who)
             return self.send_json(403, {'error': 'That password is not right for this show'})
         # Caller remote: the show's crew link plus its own remote password lets a phone run the show (the live state only)
@@ -592,7 +616,7 @@ class Handler(SimpleHTTPRequestHandler):
                     lock.notify_all()
                 return self.send_json(200, {})
             if r and hmac.compare_digest(r['hash'], hash_pw(str(data.get('pass', '')), r['salt'])):
-                return self.send_json(200, {'key': r['key']})
+                return self.send_json(200, {'key': r['key']}, self.crew_cookie(s))  # the caller needs only the remote password
             failed(who)
             return self.send_json(403, {'error': 'That remote password is not right'})
         if not self.user():
@@ -633,7 +657,7 @@ class Handler(SimpleHTTPRequestHandler):
                 passes = read_json(crew_path, {})
                 if pw:
                     salt = secrets.token_hex(16)
-                    passes[sid] = {'salt': salt, 'hash': hash_pw(pw, salt)}
+                    passes[sid] = {'salt': salt, 'hash': hash_pw(pw, salt), 'key': secrets.token_urlsafe(24)}  # new key: everyone asked again
                 else:
                     passes.pop(sid, None)
                 write_json(crew_path, passes)
@@ -756,8 +780,10 @@ class Handler(SimpleHTTPRequestHandler):
                             self.wfile.write(b'data: {"off":"ended","title":""}\n\n')
                         break
                     now, s = (version[sid], viewers[sid]), shows[sid]
-                    off = crew and crew_state(s) != 'open'  # not on the crew page: crew get this, never the show
-                    body = {'off': crew_state(s), 'title': s.get('title', '')} if off else {'show': s}
+                    st = crew_state(s) if crew else 'open'  # not on the crew page, or no current password key: never the show
+                    body = ({'off': st} if st != 'open' else {'locked': True} if crew and not self.crew_ok(s) else {'show': s})
+                    if 'show' not in body:
+                        body['title'] = s.get('title', '')
                     msg = json.dumps({'viewers': now[1], 't': int(time.time() * 1000), **body}, separators=(',', ':')).encode() if now != seen else None
                 seen = now
                 self.wfile.write(b'data: %s\n\n' % msg if msg else b': ping\n\n')

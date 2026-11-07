@@ -92,6 +92,23 @@ locked = call('/api/crew')[2][0]
 assert locked['locked'] and 'token' not in locked, 'a locked show hides its link'
 assert call(f'/api/crew/{gig["id"]}', 'POST', {'pass': 'wrong'})[0] == 403
 assert call(f'/api/crew/{gig["id"]}', 'POST', {'pass': 'stage door'})[2]['token'] == gig['viewToken']
+# The password guards the crew link itself, not just the /crew page, and every push live asks everyone again
+link = f'/api/view/{gig["viewToken"]}'
+assert call(link)[::2] == (403, {'locked': True, 'title': 'Tonight'}), 'a crew link asks for the password'
+assert call(link, 'POST', {'pass': 'wrong'}, ip='6.6.6.6')[0] == 403
+st, h, _ = call(link, 'POST', {'pass': 'stage door'}, ip='6.6.6.6')
+crew_cookie = h['Set-Cookie'].split(';')[0]
+assert st == 200 and 'HttpOnly' in h['Set-Cookie'] and call(link, cookie=crew_cookie)[0] == 200, 'the right password opens it'
+via_page = call(f'/api/crew/{gig["id"]}', 'POST', {'pass': 'stage door'})[1]['Set-Cookie'].split(';')[0]
+assert call(link, cookie=via_page)[0] == 200, 'the /crew page password opens the link too'
+stream = urllib.request.urlopen(base + f'/api/events/v/{gig["viewToken"]}', timeout=5)
+line = b''
+while not line.startswith(b'data: '):
+    line = stream.readline()
+assert json.loads(line[6:]).get('locked') and b'"show"' not in line, 'a screen without the key never gets the show'
+stream.close()
+call(f'/api/shows/{gig["id"]}/crew', 'POST', {'on': True, 'pass': 'stage door'}, cookie)
+assert call(link, cookie=crew_cookie)[2] == {'locked': True, 'title': 'Tonight'}, 'pushed live again: everyone is asked again'
 gig2 = call(f'/api/shows/{gig["id"]}', cookie=cookie)[2]
 assert 'stage door' not in json.dumps(gig2) and 'hash' not in json.dumps(gig2), 'password never sent with the show'
 gig2['crewLocked'] = False; gig2['onCrew'] = False
@@ -202,6 +219,9 @@ call(f'/api/shows/{sid_}/crew', 'POST', {'on': False}, cookie)
 assert call(f'/api/view/{tok}')[::2] == (403, {'off': 'ended', 'title': t['title']}), 'taken off after running: finished'
 assert press({'id': first}) == 403, 'the remote stops too'
 assert call(f'/api/shows/{sid_}/crew', 'POST', {'on': True, 'pass': ''}, cookie)[0] == 200 and call(f'/api/view/{tok}')[0] == 200, 'push live again and it reopens'
+call(f'/api/shows/{sid_}/crew', 'POST', {'on': True, 'pass': 'band call'}, cookie)
+h = call(f'/api/remote/{tok}', 'POST', {'pass': 'new one'}, ip='5.5.5.7')[1]
+assert call(f'/api/view/{tok}', cookie=h['Set-Cookie'].split(';')[0])[0] == 200, 'the remote password lets the caller see a locked show'
 # Archiving takes it off the crew page, and an archived show can't be pushed live
 arch = call(f'/api/shows/{sid_}', cookie=cookie)[2]
 arch['archived'] = True

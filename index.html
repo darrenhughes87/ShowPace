@@ -342,6 +342,7 @@ body[data-view="timer"] .top,body[data-view="off"] .top{display:none}
 .tv .count{font-size:min(34vh,26vw);height:min(34vh,26vw);justify-content:center;margin:0;letter-spacing:-.04em}
 .tv .prog{height:2.2vh;border-radius:1.1vh;background:#222}
 .off .tv-mid{gap:1.5vh}.off-h{font:700 min(8vh,7vw)/1.1 var(--display);color:#fff}
+.off-form{display:flex;gap:8px;justify-content:center;margin-top:2vh}.off-form input{width:min(260px,60vw);font-size:16px}.off-err{margin:0}
 .off-p{margin:0;font-size:min(3.5vh,4.5vw);color:#bbb}.off-n{margin:2vh 0 0;font-size:min(2.6vh,3.6vw);color:#777}
 .tv-next{font-size:3vh;line-height:1.3;height:1.3em;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
@@ -478,7 +479,7 @@ async function openShow() {
   try {
     const r = await api(R.token ? `/api/view/${R.token}` : `/api/shows/${R.id}`);
     if (r.status === 401) { viewLogin(); return false; }
-    if (r.data?.off) { viewOff(r.data); connect(); return false; }
+    if (r.data?.off || r.data?.locked) { viewOff(r.data); connect(); return false; }
     if (!r.ok) { show = null; viewMissing(r.data?.error || 'That show could not be found.'); return false; }
     if (!dirty) show = r.data; else show.live = r.data.live;  // unsent edits are kept; where the show is comes from the server
   } catch {
@@ -488,16 +489,27 @@ async function openShow() {
   connect();
   return true;
 }
-// Full screen, like the Clock: the show isn't open to crew yet, or it has finished. The stream stays open, so it
-// switches back to the show by itself when it's pushed live again.
+// Full screen, like the Clock: the show isn't open to crew yet, it has finished, or it needs the crew password (the remote
+// asks for its own). The stream stays open, so it switches back to the show by itself when it's pushed live again.
 function viewOff(m) {
+  const state = m.off || 'locked', remote = R.view === 'remote';
   show = null; lastJs = ''; store.set('show.' + sid, null);  // no copy of the running order is left on this device
+  if ($('#app .off')?.dataset.state === state) return;  // already showing it: don't wipe a password being typed
   document.body.dataset.view = 'off'; document.body.classList.remove('t-over', 't-warn');  // calm black, whatever state it ended in
   $('#top').innerHTML = '';
-  $('#app').innerHTML = `<section class="tv off"><div></div><div class="tv-mid">
-    <div class="off-h">${m.off === 'ended' ? 'This show has finished' : "This show isn't open yet"}</div>
-    <p class="off-p">${m.off === 'ended' ? 'Thanks for following.' : 'This page opens by itself when the show goes live.'}</p>
+  const [h, sub] = {ended:['This show has finished', 'Thanks for following.'],
+    notyet:["This show isn't open yet", 'This page opens by itself when the show goes live.'],
+    locked:['This show needs a password', remote ? 'Type the remote password the show caller gave you.' : 'Ask the show caller for the crew password.']}[state];
+  $('#app').innerHTML = `<section class="tv off" data-state="${state}"><div></div><div class="tv-mid">
+    <div class="off-h">${h}</div><p class="off-p">${sub}</p>
+    ${state === 'locked' ? `<form id="off-pass" class="off-form"><input type="password" class="f" placeholder="${remote ? 'Remote password' : 'Crew password'}" aria-label="Password" autocomplete="off" required><button class="primary">Open</button></form><p class="err off-err" hidden></p>` : ''}
     ${m.title ? `<p class="off-n">${esc(m.title)}</p>` : ''}</div><div></div><div></div></section>`;
+  if (state === 'locked') $('#off-pass').onsubmit = async e => {
+    e.preventDefault();
+    const r = await api(remote ? `/api/remote/${R.token}` : `/api/view/${R.token}`, {method:'POST', body:JSON.stringify({pass:$('#off-pass input').value})}).catch(() => null);
+    if (r?.ok) { if (remote) store.set('rkey.' + R.token, r.data.key); return location.reload(); }
+    const err = $('.off-err'); err.hidden = false; err.textContent = r?.data?.error || "Can't reach the server. Check the signal and try again.";
+  };
 }
 function connect() {
   const src = es = new EventSource(R.token ? `/api/events/v/${R.token}` : `/api/events/${R.id}`);
@@ -506,7 +518,7 @@ function connect() {
   src.onerror = () => { online = false; syncChip(); if (src.readyState === 2) setTimeout(() => es === src && connect(), 3000); };
   src.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.off) return viewOff(m);  // taken off the crew page or archived: this crew screen closes, and rejoins when it's back
+    if (m.off || m.locked) return viewOff(m);  // off the crew page, or a new password: this screen closes, and rejoins when it can
     const js = JSON.stringify(m.show), was = lastJs && JSON.parse(lastJs).live;
     viewers = m.viewers;
     if (js === lastJs || m.show.src === SRC) { lastJs = js; return tick(); }
@@ -1113,7 +1125,7 @@ const ACT = {
       if (!confirm('Take this show off the crew page? Every crew screen, Clock and phone remote closes straight away. Push live again to reopen them.')) return;
       body = {on:false};
     } else {
-      const pw = prompt('Push live to the crew page.\n\nCrew password (leave empty to let crew straight in):', '');
+      const pw = prompt('Push live to the crew page.\n\nCrew password (leave empty to let crew straight in). With a password, everyone has to type it, even people who already have the link:', '');
       if (pw === null) return;
       body = {on:true, pass:pw};
     }
