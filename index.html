@@ -70,6 +70,8 @@ a{color:inherit}
 .crew-menu .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:8;width:280px;display:grid;gap:6px;padding:12px;
   background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
 .crew-menu .menu p{margin:0 0 4px;color:var(--muted);font-size:12px;line-height:1.4}
+.crew-menu .menu .lab{margin-top:8px}.crew-menu .menu .lab:first-child{margin-top:0}
+.crew-menu summary .dot{width:8px;height:8px;border-radius:50%;background:#7fd598}
 .crew-menu .menu button{text-align:left}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top);background:var(--bg);z-index:10}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none}
@@ -78,6 +80,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .show-name b{font:400 17px/1.2 var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .show-name small{color:var(--muted);font-size:12px}
 .tabs,.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+.top [data-label]{position:relative}
+.top [data-label]::before{content:attr(data-label);position:absolute;top:-6px;left:9px;padding:0 4px;font-size:9px;line-height:11px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dim);background:var(--bg);pointer-events:none}
 .tabs a,.seg button{border:0;background:none;border-radius:6px;padding:6px 12px;color:var(--muted);text-decoration:none;font-weight:700;font-size:13px}
 .tabs a:hover,.seg button:hover{color:var(--fg)}
 .tabs a[aria-current="page"],.seg button[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
@@ -624,15 +629,18 @@ function topShow() {
     : [['edit', 'Edit', base], ['call', 'Call', base + '/call'], ['crew', 'Crew', base + '/crew'], ['timer', 'Clock', base + '/timer']];
   $('#top').innerHTML = `<a class="logo" href="${R.token ? '/crew' : '#'}" title="${R.token ? "Today's shows" : 'All shows'}"><span>${appName()}</span></a>
     <div class="show-name"><b>${esc(show.title || 'Untitled show')}</b><small>${fmtDate(show.date)}</small></div>
-    <nav class="tabs" aria-label="View">${tabs.map(([v, l, h]) => `<a href="${h}"${R.view === v ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>
-    <div class="seg" role="group" aria-label="Detail"><button data-a="mode" data-v="0" aria-pressed="${!simple}">Technical</button><button data-a="mode" data-v="1" aria-pressed="${simple}">Simple</button></div>
+    <nav class="tabs" aria-label="View" data-label="Views">${tabs.map(([v, l, h]) => `<a href="${h}"${R.view === v ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>
+    <div class="seg" role="group" aria-label="Detail" data-label="Detail"><button data-a="mode" data-v="0" aria-pressed="${!simple}">Technical</button><button data-a="mode" data-v="1" aria-pressed="${simple}">Simple</button></div>
     <div class="right"><span class="sync" data-t="sync"></span>${R.token ? '' : `
-      <details class="crew-menu"><summary class="btn${show.onCrew ? ' on' : ''}">${show.onCrew ? 'Live to crew' : 'Crew'} ▾</summary>
-        <div class="menu"><p>${show.onCrew ? `On the crew page${show.crewLocked ? ', with a password' : ', crew go straight in'}.` : 'Not live to crew. Crew links say the show is not open yet until you push live.'}</p>
+      <details class="crew-menu"><summary class="btn${show.onCrew ? ' on' : ''}" title="${show.onCrew ? 'Live to crew' : 'Not live to crew'}">${show.onCrew ? '<span class="dot"></span>' : ''}Crew &amp; stage ▾</summary>
+        <div class="menu"><div class="lab">Crew</div>
+          <p>${show.onCrew ? `Live. ${show.crewLocked ? 'Everyone has to type the crew password.' : 'Crew go straight in.'}` : "Not live. Crew links say the show isn't open yet."}</p>
           <button data-a="pushLive" class="${show.onCrew ? '' : 'primary'}">${show.onCrew ? 'Take off the crew page' : 'Push live'}</button>
-          <button data-a="message">Message the speaker</button>
           <button data-a="copyLink">Copy this show's crew link</button><button data-a="crewPage">Copy crew page link</button>
-          <button data-a="remote">${show.remoteOn ? 'Caller remote: show QR' : 'Set up caller remote'}</button>${show.remoteOn ? '<button data-a="remotePass">New remote password</button>' : ''}</div></details>`}</div>`;
+          <div class="lab">Speaker</div>
+          <button data-a="message">Message the speaker</button>
+          <div class="lab">Caller remote</div>
+          <button data-a="remote">${show.remoteOn ? 'Show the QR code' : 'Set up caller remote'}</button>${show.remoteOn ? '<button data-a="remotePass">New remote password</button>' : ''}</div></details>`}</div>`;
   syncChip();
 }
 const techGrid = it => {

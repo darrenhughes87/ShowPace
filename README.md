@@ -180,10 +180,10 @@ sudo docker compose logs
 3. **Make it yours.** Also on the Admin page: the app's name, your company name, the main colour, and how long people stay logged in.
 4. **Make a show.** Press **New show**. Or press **Download template**, fill it in (Excel is fine), then **Upload running order**.
 5. **Run it.** Open the show and press **Call**. Press **Start show**, then **Complete** as each segment ends.
-6. **Share it.** From the **Crew** menu: a crew link, the speaker **Clock**, and the **caller remote** for your phone.
-   Crew links only show the show while it's live: press **Push live** in the Crew menu. Before that they say "This show isn't open yet". When you take it off (or archive it), every crew screen says "This show has finished". Push it live again and they come straight back.
+6. **Share it.** From the **Crew & stage** menu: a crew link, the speaker **Clock**, and the **caller remote** for your phone.
+   Crew links only show the show while it's live: press **Push live** in the Crew & stage menu. Before that they say "This show isn't open yet". When you take it off (or archive it), every crew screen says "This show has finished". Push it live again and they come straight back.
    Push live with a crew password and everyone has to type it, even people who already have the link. Push live again and they're asked again, so you can always shut someone out by changing the password.
-7. **Talk to the speaker.** In the **Crew** menu, press **Message the speaker**. Pick one or type your own, then **Send**. It clears itself when you press Complete, or press ✕.
+7. **Talk to the speaker.** In the **Crew & stage** menu, press **Message the speaker**. Pick one or type your own, then **Send**. It clears itself when you press Complete, or press ✕.
 
 **On a stage iPad:** in the iPad's Settings, set Auto-Lock to Never. In Safari, Share, then Add to Home Screen, opens ShowPace full screen.
 
