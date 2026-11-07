@@ -373,6 +373,15 @@ def failed(ip):
     time.sleep(1)
 
 
+def crew_state(s):
+    """Crew links (crew view, Clock, phone remote) only open a show while it's live on the crew page.
+    Otherwise they say it isn't open yet, or that it has finished once it has been run or archived."""
+    if s.get('onCrew') and not s.get('archived'):
+        return 'open'
+    live = s.get('live') or {}
+    return 'ended' if s.get('archived') or live.get('id') or live.get('log') else 'notyet'  # started at some point: it has finished
+
+
 def crew_list():
     """The /crew page: shows pushed live and not archived. Locked shows don't reveal their link."""
     out = []
@@ -490,11 +499,15 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.fullmatch(r'/api/view/([A-Za-z0-9_-]+)', path)
         if m:
             s = self.by_token(m.group(1))
-            return self.send_json(200, s) if s else self.send_json(404, {'error': 'This crew link is not valid'})
+            if not s:
+                return self.send_json(404, {'error': 'This crew link is not valid'})
+            if crew_state(s) != 'open':
+                return self.send_json(403, {'off': crew_state(s), 'title': s.get('title', '')})
+            return self.send_json(200, s)
         m = re.fullmatch(r'/api/events/(v/)?([A-Za-z0-9_-]+)', path)
         if m:
             s = self.by_token(m.group(2)) if m.group(1) else (self.user() and shows.get(m.group(2)))
-            return self.events(s['id']) if s else self.send_json(404, {'error': 'Not found'})
+            return self.events(s['id'], crew=bool(m.group(1))) if s else self.send_json(404, {'error': 'Not found'})
         if not self.user():
             return self.send_json(401, {'error': 'Log in'})
         if path in ('/api/users', '/api/settings'):
@@ -566,6 +579,8 @@ class Handler(SimpleHTTPRequestHandler):
             if m.group(2):  # a press on the phone: its new live state, with the key it got for the right password
                 if not r or not hmac.compare_digest(r['key'].encode(), str(data.get('key', '')).encode()):
                     return self.send_json(403, {'error': 'This remote has been locked. Ask the show caller for the new remote password.'})
+                if crew_state(s) != 'open':
+                    return self.send_json(403, {'error': 'This show is not live on the crew page'})
                 with lock:
                     s = shows.get(s['id'])
                     if not s:
@@ -611,6 +626,8 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.fullmatch(r'/api/shows/([A-Za-z0-9_-]+)/crew', path)
         if m and m.group(1) in shows:
             sid, on = m.group(1), bool(data.get('on'))
+            if on and shows[sid].get('archived'):
+                return self.send_json(409, {'error': 'Restore the show before pushing it live'})
             pw = str(data.get('pass', '')).strip() if on else ''
             with lock:
                 passes = read_json(crew_path, {})
@@ -669,6 +686,8 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:
             return self.send_json(400, {'error': 'Not a ShowPace show'})
         # Last save wins. Fine with one person calling the show; two people editing the same show at once would overwrite each other.
+        if s['archived']:
+            s['onCrew'] = False  # archiving takes it off the crew page, so restoring it doesn't quietly reopen it
         s['src'] = self.headers.get('x-showpace-src', '')
         with lock:
             shows[sid] = s
@@ -716,7 +735,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_json(200, {})
 
     # Server-sent events: the show on connect, then every change, plus how many devices are watching.
-    def events(self, sid):
+    def events(self, sid, crew=False):
         if viewers.get(sid, 0) >= MAX_VIEWERS:
             return self.send_json(503, {'error': 'Too many devices are watching this show'})
         self.send_response(200)
@@ -732,10 +751,14 @@ class Handler(SimpleHTTPRequestHandler):
             while True:
                 with lock:
                     lock.wait_for(lambda: sid not in shows or (version[sid], viewers[sid]) != seen, timeout=15)
-                    if sid not in shows:  # deleted
+                    if sid not in shows:  # deleted: crew screens say it has finished
+                        if crew:
+                            self.wfile.write(b'data: {"off":"ended","title":""}\n\n')
                         break
-                    now = (version[sid], viewers[sid])
-                    msg = json.dumps({'viewers': now[1], 't': int(time.time() * 1000), 'show': shows[sid]}, separators=(',', ':')).encode() if now != seen else None
+                    now, s = (version[sid], viewers[sid]), shows[sid]
+                    off = crew and crew_state(s) != 'open'  # not on the crew page: crew get this, never the show
+                    body = {'off': crew_state(s), 'title': s.get('title', '')} if off else {'show': s}
+                    msg = json.dumps({'viewers': now[1], 't': int(time.time() * 1000), **body}, separators=(',', ':')).encode() if now != seen else None
                 seen = now
                 self.wfile.write(b'data: %s\n\n' % msg if msg else b': ping\n\n')
                 self.wfile.flush()

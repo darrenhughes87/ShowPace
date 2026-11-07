@@ -20,7 +20,8 @@ def call(path, method='GET', data=None, cookie='', ctype='application/json', ip=
             raw = r.read()
             return r.status, r.headers, json.loads(raw) if raw and 'json' in r.headers.get('Content-Type', '') else raw
     except urllib.error.HTTPError as e:
-        return e.code, e.headers, None
+        raw = e.read()
+        return e.code, e.headers, json.loads(raw) if raw and 'json' in e.headers.get('Content-Type', '') else None
 
 
 # First run: nobody yet, so the page asks for the admin login. It only works once.
@@ -68,8 +69,12 @@ assert call('/api/shows', 'POST', {'title': 'x', 'items': []}, cookie, ctype='te
 
 show['title'] = 'Changed'; show['viewToken'] = 'hijack'
 assert call(f'/api/shows/{show["id"]}', 'PUT', show, cookie)[0] == 200
-st, _, crew = call(f'/api/view/{call("/api/shows", cookie=cookie)[2][0]["viewToken"]}')
+vt = call('/api/shows', cookie=cookie)[2][0]['viewToken']
+assert call(f'/api/view/{vt}')[::2] == (403, {'off': 'notyet', 'title': 'Changed'}), 'a crew link shows nothing until the show is pushed live'
+call(f'/api/shows/{show["id"]}/crew', 'POST', {'on': True, 'pass': ''}, cookie)
+st, _, crew = call(f'/api/view/{vt}')
 assert st == 200 and crew['title'] == 'Changed' and crew['viewToken'] != 'hijack', 'crew link works, token not changeable'
+call(f'/api/shows/{show["id"]}/crew', 'POST', {'on': False}, cookie)
 assert call(f'/api/shows/{show["id"]}', 'PUT', show)[0] == 401, 'crew cannot edit'
 assert call('/api/view/not-a-real-token')[0] == 404
 for secret in ('/data/users.json', '/server.py', '/data/sessions.json'):
@@ -160,6 +165,7 @@ assert up('Gig.numbers', b'x')[0] == 400 and up('Rubbish.csv', b'no headings her
 
 # Caller remote: its own password; the phone sends the live state; a new password locks old phones out
 tok, sid_ = t['viewToken'], t['id']
+call(f'/api/shows/{sid_}/crew', 'POST', {'on': True, 'pass': ''}, cookie)  # the remote runs a show that's live on the crew page
 assert call(f'/api/shows/{sid_}/remote', 'POST', {'pass': 'on stage'})[0] == 401, 'staff set it'
 assert call(f'/api/shows/{sid_}/remote', 'POST', {'pass': 'on stage'}, cookie)[2] == {'remoteOn': True}
 assert call(f'/api/remote/{tok}', 'POST', {'pass': 'wrong'}, ip='5.5.5.5')[0] == 403
@@ -188,6 +194,38 @@ assert call(f'/api/shows/{sid_}', cookie=cookie)[2]['remoteOn'], 'saving the sho
 call(f'/api/shows/{sid_}/remote', 'POST', {'pass': 'new one'}, cookie)
 assert press({'id': first}) == 403, 'a new password locks out phones using the old one'
 assert call('/r/anything')[0] == 200
+
+# Off the crew page, crew links and the remote stop. Once the show has been run, crew are told it has finished.
+key = call(f'/api/remote/{tok}', 'POST', {'pass': 'new one'}, ip='5.5.5.6')[2]['key']
+assert press({'id': first}) == 200
+call(f'/api/shows/{sid_}/crew', 'POST', {'on': False}, cookie)
+assert call(f'/api/view/{tok}')[::2] == (403, {'off': 'ended', 'title': t['title']}), 'taken off after running: finished'
+assert press({'id': first}) == 403, 'the remote stops too'
+assert call(f'/api/shows/{sid_}/crew', 'POST', {'on': True, 'pass': ''}, cookie)[0] == 200 and call(f'/api/view/{tok}')[0] == 200, 'push live again and it reopens'
+# Archiving takes it off the crew page, and an archived show can't be pushed live
+arch = call(f'/api/shows/{sid_}', cookie=cookie)[2]
+arch['archived'] = True
+call(f'/api/shows/{sid_}', 'PUT', arch, cookie)
+assert not call(f'/api/shows/{sid_}', cookie=cookie)[2]['onCrew'] and call(f'/api/view/{tok}')[2]['off'] == 'ended'
+assert call(f'/api/shows/{sid_}/crew', 'POST', {'on': True, 'pass': ''}, cookie)[0] == 409, 'restore it first'
+# A crew screen left open while it's off gets told so (never the show), then rejoins when it's pushed live again
+stream = urllib.request.urlopen(base + f'/api/events/v/{tok}', timeout=5)
+def next_msg():
+    while True:
+        line = stream.readline()
+        if line.startswith(b'data: '):
+            return json.loads(line[6:])
+m = next_msg()
+assert m['off'] == 'ended' and 'show' not in m, 'an open crew screen is told it has finished'
+arch['archived'] = False
+call(f'/api/shows/{sid_}', 'PUT', arch, cookie)
+call(f'/api/shows/{sid_}/crew', 'POST', {'on': True, 'pass': ''}, cookie)
+for _ in range(5):
+    m = next_msg()
+    if 'show' in m:
+        break
+assert m['show']['id'] == sid_, 'pushed live again: the open screen rejoins by itself'
+stream.close()
 
 # Deleting: only archived shows, only staff, and the file is kept in data/deleted
 gone = x['id']
