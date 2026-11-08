@@ -403,6 +403,8 @@ def crew_list():
 
 
 class Handler(SimpleHTTPRequestHandler):
+    server_version, sys_version = 'ShowPace', ''  # don't tell the world which Python this runs on
+
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=DIR, **kw)
 

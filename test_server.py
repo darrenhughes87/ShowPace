@@ -129,6 +129,7 @@ assert bad['items'][1] == {'id': 'ok_1', 'type': 'header', **{k: (('Section') if
 
 # Every page carries a security policy
 assert "default-src 'self'" in call('/')[1]['Content-Security-Policy']
+assert 'Python' not in call('/')[1]['Server'], 'the Python version is not given away'
 
 assert call('/data/settings.json')[0] in (401, 404) and call('/data/../server.py')[0] in (401, 404)
 
