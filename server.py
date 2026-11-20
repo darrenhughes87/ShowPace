@@ -460,7 +460,7 @@ class Handler(SimpleHTTPRequestHandler):
                       '.js': 'text/javascript; charset=utf-8', '.csv': 'text/csv; charset=utf-8'}
 
     def sess_id(self):
-        m = re.search(r'showpace_session=([A-Za-z0-9_-]+)', self.headers.get('Cookie', ''))
+        m = re.search(r'(?:^|;\s*)showpace_session=([A-Za-z0-9_-]+)', self.headers.get('Cookie', ''))  # the whole name, not the tail of another cookie's
         return m and m.group(1)
 
     def user(self):

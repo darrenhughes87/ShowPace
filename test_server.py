@@ -141,6 +141,7 @@ assert call('/api/login', 'POST', {'user': 'sam', 'pass': 'correct horse battery
 assert call('/api/crew/nope', 'POST', {'pass': 'x'}, ip='9.9.9.9')[0] == 403, 'crew typos are counted apart from logins'
 assert call('/api/login', 'POST', {'user': 'sam', 'pass': 'x'}, ip='1.1.1.1, 9.9.9.9')[0] == 429, 'the address Caddy adds is the one counted'
 assert call('/server.py', 'HEAD')[0] == 405
+assert call('/api/me', cookie='%s=someone-elses; ' % 'xshowpace_session' + cookie)[0] == 200, "another app's cookie with a similar name doesn't get in the way"
 assert call('/', 'POST', {})[0] == 400 and call('/api/login', 'POST', ['not', 'an', 'object'])[0] == 400, 'odd posts are refused, not crashed on'
 server.PROXY = False  # run on a laptop: links for other devices use its network address, never localhost
 lan = call('/api/me', cookie=cookie)[2]['lan']
