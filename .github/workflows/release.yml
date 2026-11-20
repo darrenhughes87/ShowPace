@@ -41,7 +41,7 @@ jobs:
           [ "$RUNNER_OS" = Windows ] || app=dist/ShowPace.app/Contents/MacOS/ShowPace
           "$app" & first=$!
           for i in $(seq 1 60); do curl -fs http://localhost:4320/api/time > /dev/null && break; sleep 1; done
-          curl -fs http://localhost:4320/ | grep -q '<title>ShowPace</title>'
+          curl -fs http://localhost:4320/ -o page.html && grep -q '<title>ShowPace</title>' page.html
           curl -fs http://localhost:4320/qrcode.min.js > /dev/null
           "$app" & second=$!
           sleep 15
