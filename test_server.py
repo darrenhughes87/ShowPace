@@ -6,8 +6,7 @@ os.environ['SHOWPACE_PROXY'] = '1'  # so the tests can play different addresses
 import server
 
 server.load()
-srv = server.ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
-srv.daemon_threads = True
+srv = server.Server(('127.0.0.1', 0), server.Handler)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 base = f'http://127.0.0.1:{srv.server_address[1]}'
 
@@ -36,14 +35,14 @@ assert call('/api/login', 'POST', {'user': 'sam', 'pass': 'wrong'})[0] == 401, '
 st, h, _ = call('/api/login', 'POST', {'user': 'Sam', 'pass': 'correct horse battery'})
 assert st == 200 and 'HttpOnly' in h['Set-Cookie']
 cookie = h['Set-Cookie'].split(';')[0]
-assert call('/api/me', cookie=cookie)[2] == {'user': 'sam', 'admin': True}
+assert call('/api/me', cookie=cookie)[2] == {'user': 'sam', 'admin': True, 'version': server.VERSION, 'lan': None}
 
 # Admin: add people, and only admins can
 assert call('/api/users', 'POST', {'user': 'jo', 'pass': 'another good one', 'admin': False}, cookie)[0] == 200
 assert call('/api/users', 'POST', {'user': 'Bad Name!', 'pass': 'another good one'}, cookie)[0] == 400
 assert call('/api/users', cookie=cookie)[2] == [{'name': 'jo', 'admin': False}, {'name': 'sam', 'admin': True}]
 jo = call('/api/login', 'POST', {'user': 'jo', 'pass': 'another good one'})[1]['Set-Cookie'].split(';')[0]
-assert call('/api/me', cookie=jo)[2] == {'user': 'jo', 'admin': False}
+assert call('/api/me', cookie=jo)[2]['admin'] is False
 assert call('/api/users', cookie=jo)[0] == 403 and call('/api/settings', cookie=jo)[0] == 403, 'not an admin'
 assert call('/api/users', 'POST', {'user': 'jo', 'pass': 'x' * 12, 'admin': True}, jo)[0] == 403
 assert call('/api/users', 'POST', {'user': 'sam', 'pass': '', 'admin': False}, cookie)[0] == 400, 'keep at least one admin'
@@ -142,6 +141,11 @@ assert call('/api/login', 'POST', {'user': 'sam', 'pass': 'correct horse battery
 assert call('/api/crew/nope', 'POST', {'pass': 'x'}, ip='9.9.9.9')[0] == 403, 'crew typos are counted apart from logins'
 assert call('/api/login', 'POST', {'user': 'sam', 'pass': 'x'}, ip='1.1.1.1, 9.9.9.9')[0] == 429, 'the address Caddy adds is the one counted'
 assert call('/server.py', 'HEAD')[0] == 405
+assert call('/', 'POST', {})[0] == 400 and call('/api/login', 'POST', ['not', 'an', 'object'])[0] == 400, 'odd posts are refused, not crashed on'
+server.PROXY = False  # run on a laptop: links for other devices use its network address, never localhost
+lan = call('/api/me', cookie=cookie)[2]['lan']
+assert lan is None or lan.startswith('http://') and '127.' not in lan and lan.endswith(':%d' % srv.server_address[1]), lan
+server.PROXY = True
 import time
 assert abs(call('/api/time')[2]['t'] - time.time() * 1000) < 2000, 'the server tells screens the time'
 assert server.length('0:10') == 600 and server.length('5:30') == 330 and server.length('10') == 600, 'a CSV 0:10 is ten minutes, as in Excel'

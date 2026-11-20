@@ -14,75 +14,108 @@ You build the running order. On the day, you press **Complete** as each segment 
 - **Caller remote:** run the show from your phone.
 - **Speaker messages:** send a short note to the speaker's clock, like Wrap up or Speak up. It shows where the title was, so the countdown never moves.
 
-There's nothing to install apart from Python. No database. Your shows are saved as files.
+No accounts, no subscription, no database. Your shows are saved as files on your own computer.
 
 ---
 
 ## Pick one
 
-- **Just trying it, or using it at one venue?** [Run it on your computer](#run-it-on-your-computer). Takes 2 minutes.
+- **Using it at a venue?** [Download the app](#download-the-app) for Mac or Windows. Takes 2 minutes.
 - **Want a web address that works from anywhere?** [Put it on a server](#put-it-on-a-server-vps). Takes about 15 minutes.
+- **Rather run it from the code?** [Run it with Python](#run-it-with-python).
 
 ---
 
-## Run it on your computer
+## Download the app
 
-Phones and iPads on the same Wi-Fi can connect to it too.
+Go to the [latest release](https://github.com/darrenhughes87/ShowPace/releases/latest) and download the one for your computer. Everything it needs is inside. There's nothing else to install.
+
+The apps aren't signed with Apple or Microsoft (that costs money every year), so each one asks if you're sure the first time. After that it just opens.
 
 ### Mac
 
-1. **Get ShowPace.** On this page, press the green **Code** button, then **Download ZIP**. Double-click the ZIP to unzip it.
-2. **Open Terminal.** Press `Cmd + Space`, type `Terminal`, press Enter.
-3. **Go into the folder.** Type `cd ` (with a space after it), drag the ShowPace folder into the Terminal window, then press Enter.
-4. **Start it:**
-
-   ```bash
-   python3 server.py
-   ```
-
-5. **Open it.** Go to http://localhost:4320 in your browser.
-
-If your Mac says `python3` isn't found, or pops up asking to install developer tools: install Python from [python.org/downloads](https://www.python.org/downloads/), then try step 4 again.
+1. Download **ShowPace-Mac.zip** and double-click it to unzip.
+2. Drag **ShowPace** into your Applications folder, then open it.
+3. **The first time, macOS refuses to open it.** Press **Done**, then go to **System Settings**, **Privacy & Security**, scroll to the bottom and press **Open Anyway**.
+4. If it asks about incoming network connections, press **Allow**. That lets phones and iPads connect.
 
 ### Windows
 
-1. **Get Python.** Download it from [python.org/downloads](https://www.python.org/downloads/) and run the installer. On the first screen, tick **Add python.exe to PATH**.
-2. **Get ShowPace.** On this page, press the green **Code** button, then **Download ZIP**. Right-click the ZIP, choose **Extract All**.
-3. **Open a command window in the folder.** Open the ShowPace folder, click in the address bar at the top, type `cmd`, press Enter.
-4. **Start it:**
+1. Download **ShowPace-Windows.exe** and open it.
+2. **If you see "Windows protected your PC",** press **More info**, then **Run anyway**.
+3. **If it asks about the firewall,** press **Allow**. That lets phones and iPads connect.
 
-   ```bash
-   py server.py
-   ```
+### What you get
 
-5. **If Windows asks about the firewall,** click **Allow**. That lets phones and iPads on your Wi-Fi connect.
-6. **Open it.** Go to http://localhost:4320 in your browser.
+A small window that says **ShowPace is running**, and ShowPace opens in your browser. The first time, it asks you to make an admin login. That's you.
 
-If `py` isn't found, try `python server.py` instead.
+- **Keep the window open during the show.** Closing it stops ShowPace.
+- **It keeps your computer awake** while it's open. Keep the lid open and the charger in.
+- **Show my files** opens the folder where your shows are saved. Copy that folder to back them up.
+- **Forgot your password?** Press **Show my files**, delete `users.json`, then quit and reopen ShowPace. It asks you to make a new login. Your shows are kept.
+- **A newer version?** Download it and replace the old app. Your shows and logins stay where they are.
 
-### Linux
+---
+
+## On site
+
+ShowPace runs on your computer, and every other screen connects to it over the network. So the network is the thing to get right.
+
+**1. Put everything on the same network.** Pick one:
+
+- **Your own travel router** (the best). Plug it in, join your laptop, iPads and phones to its Wi-Fi. It works with no internet at all.
+- **Your phone's hotspot.** Join the laptop and the other devices to it.
+- **The venue's Wi-Fi.** Test it first. Many venues stop devices talking to each other, and then nothing can connect. If the QR code won't load on your phone, that's why. Use a hotspot or your own router.
+
+**2. Connect the other screens.** On the Shows page press **Open on another device** and scan the QR code. Every link in ShowPace has a QR code:
+
+- **Crew link** and **Crew page:** for crew phones.
+- **Clock link:** for the stage screen.
+- **Caller remote:** to run the show from your phone.
+
+**3. Stop screens going to sleep.**
+
+- **On a stage iPad:** Settings, Display & Brightness, Auto-Lock, **Never**. Plug it in.
+- **For a full-screen clock:** in Safari, press Share, then **Add to Home Screen**, and open it from there.
+- **On the laptop:** the app keeps it awake. Keep the lid open and the charger in.
+
+**4. Do a test before doors.** Start the show, check the clock on stage moves, press Back. If a screen says it's offline, it has dropped off the Wi-Fi: it reconnects by itself when it's back.
+
+Screens need a browser from the last few years: Safari 16.4 or newer on iPhones and iPads, or any recent Chrome, Edge or Firefox.
+
+---
+
+## Run it with Python
+
+The app is just this code with Python packed in. If you already have Python 3.8 or newer, you can run it straight from the folder.
+
+Get the code with the green **Code** button, then **Download ZIP**, and unzip it. Or:
 
 ```bash
 git clone https://github.com/darrenhughes87/ShowPace.git
 ```
 
-```bash
-cd ShowPace
-```
+Open a terminal in the ShowPace folder and start it.
+
+**Mac and Linux:**
 
 ```bash
 python3 server.py
 ```
 
-Then open http://localhost:4320.
+**Windows:**
 
-### Good to know
+```bash
+py server.py
+```
 
-- **The first time you open it,** it asks you to make an admin login. That's you.
-- **Phones and iPads:** when it starts, it prints a second address, like `http://192.168.1.20:4320`. Type that on any device on the same Wi-Fi.
-- **To stop it:** press `Ctrl + C` in the window. To start it again, run the same command.
-- **Your shows** are saved in the `data` folder, inside the ShowPace folder. Copy that folder to back them up.
-- **Port already in use?** Run it on another one: `python3 server.py --port 4321` (on Windows, `py server.py --port 4321`).
+Then open http://localhost:4320. It prints the address for other devices too.
+
+- **No Python?** Get it from [python.org/downloads](https://www.python.org/downloads/). On Windows, tick **Add python.exe to PATH** on the first screen.
+- **To stop it:** press `Ctrl + C`.
+- **Your shows** are saved in the `data` folder inside the ShowPace folder.
+- **Port already in use?** `python3 server.py --port 4321`
+- **Want the little window too?** `python3 app.py` runs the same thing the app does.
 
 ---
 
@@ -180,12 +213,10 @@ sudo docker compose logs
 3. **Make it yours.** Also on the Admin page: the app's name, your company name, the main colour, and how long people stay logged in.
 4. **Make a show.** Press **New show**. Or press **Download template**, fill it in (Excel is fine), then **Upload running order**.
 5. **Run it.** Open the show and press **Call**. Press **Start show**, then **Complete** as each segment ends.
-6. **Share it.** From the **Crew & stage** menu: a crew link, the speaker **Clock**, and the **caller remote** for your phone.
+6. **Share it.** From the **Crew & stage** menu: a crew link, the speaker **Clock** link, and the **caller remote** for your phone. Each one comes with a QR code.
    Crew links only show the show while it's live: press **Push live** in the Crew & stage menu. Before that they say "This show isn't open yet". When you take it off (or archive it), every crew screen says "This show has finished". Push it live again and they come straight back.
    Push live with a crew password and everyone has to type it, even people who already have the link. Push live again and they're asked again, so you can always shut someone out by changing the password.
 7. **Talk to the speaker.** In the **Crew & stage** menu, press **Message the speaker**. Pick one or type your own, then **Send**. It clears itself when you press Complete, or press ✕.
-
-**On a stage iPad:** in the iPad's Settings, set Auto-Lock to Never. In Safari, Share, then Add to Home Screen, opens ShowPace full screen.
 
 **Colours on the clock:** green while it runs, orange in the last couple of minutes, red when it's over. The speaker's clock stops at 0:00 and goes red, so they never see how far over they are. You still do.
 
@@ -198,7 +229,7 @@ sudo docker compose logs
 | Setting | What it does | Default |
 |---|---|---|
 | `SHOWPACE_PORT` | The port it runs on | `4320` |
-| `SHOWPACE_DATA` | Where shows and logins are saved | the `data` folder |
+| `SHOWPACE_DATA` | Where shows and logins are saved | the `data` folder (the app uses your own app-data folder) |
 | `SHOWPACE_SECURE` | Set to `1` when it's behind HTTPS | off |
 | `SHOWPACE_PROXY` | Set to `1` when it's behind a proxy like Caddy | off |
 
@@ -220,7 +251,9 @@ python3 test_server.py
 
 Then open http://localhost:4320/?selftest and look in the browser console for `selftest passed`.
 
-**What's inside:** `server.py` (the whole server, Python standard library only), `index.html` (the whole app), and `docker-compose.yml` with `Caddyfile` for the server setup.
+**What's inside:** `server.py` (the whole server, Python standard library only), `index.html` (the whole app), `app.py` (the little window for the Mac and Windows apps), and `docker-compose.yml` with `Caddyfile` for the server setup.
+
+**Building the apps:** push a version tag like `v1.0.1`. GitHub builds `ShowPace-Mac.zip` and `ShowPace-Windows.exe` with PyInstaller and adds them to that release (see `.github/workflows/release.yml`). Change `VERSION` in `server.py` to match first.
 
 ---
 

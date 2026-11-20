@@ -21,8 +21,7 @@
   --fg:#edf2ef; --muted:#95a09a; --dim:#7f8a84;
   --brand:#1F8F4E; --brand2:#3A9C63; --brand3:#62B183;
   --ok:#2fa35f; --warn:#F28C28; --warn-bg:#7a3d0c; --warn-bg2:#8f4a12; --bad:#E5483B; --bad-bg:#5c1f1a; --bad-bg2:#74281f;
-  --display:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  --body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; --display:var(--body);
   /* Worked out from the main colour, so a new colour on the Admin page carries through. --on-brand flips to dark text on a pale colour. */
   --on-brand:#fff;
   --tint:color-mix(in srgb,var(--brand) 22%,var(--bg)); --tint2:color-mix(in srgb,var(--brand) 40%,var(--bg));
@@ -53,12 +52,13 @@ a{color:inherit}
 
 /* Segment types: filled chips, never side stripes */
 .k-talk{background:#1f4a33;color:#cdf0d6}.k-panel{background:#24405e;color:#d5e7fb}.k-break{background:#5a3a14;color:#ffe1bf}
-.k-free{background:#1d4246;color:#cdeff1}.k-video{background:#5a2420;color:#ffd3cc}.k-music{background:#5a2643;color:#fbd6e9}.k-other{background:#3a363c;color:#e3dee5}
+.k-free{background:#1d4246;color:#cdeff1}.k-video{background:#5a2420;color:#ffd3cc}.k-music{background:#5a2643;color:#fbd6e9}.k-other{background:#333a36;color:#dfe5e1}
 
 /* Top bar */
 /* One row on desktop: brand · show · views ··· detail · status · crew. Under 1000px the views and detail drop to a second row. */
 .top{position:sticky;top:env(safe-area-inset-top);z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
-  padding-block:20px 8px;background:color-mix(in srgb,var(--bg) 96%,transparent);border-bottom:1px solid var(--line)}
+  padding-block:8px;background:color-mix(in srgb,var(--bg) 96%,transparent);border-bottom:1px solid var(--line)}
+.top:has([data-label]){padding-top:20px}  /* room for the Views and Detail labels */
 .top .right{display:flex;align-items:center;gap:8px;margin-left:auto}
 @media (max-width:999px){.top{row-gap:22px}.top .seg{order:3}.top .right{order:4}.top .tabs{order:5;flex:1 1 100%}.top .tabs a{flex:1;text-align:center}}
 /* Phones: the sync label becomes a coloured dot (its words are in the tooltip), so the header needs a row less */
@@ -107,12 +107,12 @@ input.f,.login input,.form input{background:var(--bg);border:1px solid var(--lin
 .qr{width:min(300px,70vw);background:#fff;border-radius:10px;padding:10px}
 .qr svg{display:block;width:100%;height:auto}
 .modal-card code{font-size:12px;word-break:break-all;user-select:all;color:var(--fg)}
+.modal-card .err{color:#ffb4ab}
 .modal-card .row{display:flex;gap:8px}
 .remote{display:grid;gap:12px;padding-block:14px calc(20px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto}
 .remote .r-next{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}  /* one line, so the controls below never move */
 .remote .r-next .lab{margin-bottom:4px;height:18px;line-height:18px}
 @media (max-width:899px){.remote{padding-bottom:calc(110px + env(safe-area-inset-bottom))}}  /* room for the controls fixed at the bottom */
-.remote form{display:grid;gap:10px}
 
 /* Crew page */
 .crew-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;text-decoration:none}
@@ -416,7 +416,7 @@ const store = {
 };
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200);
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200 + msg.length * 40);
 }
 
 /* ---------- state */
@@ -636,11 +636,11 @@ function topShow() {
         <div class="menu"><div class="lab">Crew</div>
           <p>${show.onCrew ? `Live. ${show.crewLocked ? 'Everyone has to type the crew password.' : 'Crew go straight in.'}` : "Not live. Crew links say the show isn't open yet."}</p>
           <button data-a="pushLive" class="${show.onCrew ? '' : 'primary'}">${show.onCrew ? 'Take off the crew page' : 'Push live'}</button>
-          <button data-a="copyLink">Copy this show's crew link</button><button data-a="crewPage">Copy crew page link</button>
+          <button data-a="crewLink">Crew link and QR code</button>
           <div class="lab">Speaker</div>
-          <button data-a="message">Message the speaker</button>
+          <button data-a="message">Message the speaker</button><button data-a="clockLink">Clock link and QR code</button>
           <div class="lab">Caller remote</div>
-          <button data-a="remote">${show.remoteOn ? 'Show the QR code' : 'Set up caller remote'}</button>${show.remoteOn ? '<button data-a="remotePass">New remote password</button>' : ''}</div></details>`}</div>`;
+          <button data-a="remote">${show.remoteOn ? 'Remote link and QR code' : 'Set up caller remote'}</button>${show.remoteOn ? '<button data-a="remotePass">New remote password</button>' : ''}</div></details>`}</div>`;
   syncChip();
 }
 const techGrid = it => {
@@ -745,8 +745,8 @@ async function viewAdmin() {
     <div class="right"><a class="btn" href="#">Back to shows</a></div>`;
   const out = html => $('#app').innerHTML = `<section class="shows wrap admin">${html}</section>`;
   if (!isAdmin) return out('<div class="empty">Only admins can open this page.</div>');
-  let u, st;
-  try { [u, st] = await Promise.all([api('/api/users'), api('/api/settings')]); } catch { return out('<div class="empty">ShowPace cannot reach the server.</div>'); }
+  let u, st, m;
+  try { [u, st, m] = await Promise.all([api('/api/users'), api('/api/settings'), api('/api/me')]); } catch { return out('<div class="empty">ShowPace cannot reach the server.</div>'); }
   if (!u.ok || !st.ok) return out(`<div class="empty">${esc(u.data?.error || st.data?.error || 'Something went wrong')}</div>`);
   const s = st.data;
   out(`<div class="shows-head"><h1>Admin</h1></div>
@@ -768,7 +768,8 @@ async function viewAdmin() {
       <label>Background<input type="color" id="st-bg" value="${esc(s.bg.toLowerCase())}"></label>
       <label>Stay logged in (days)<input type="number" id="st-days" min="1" max="365" value="${+s.sessionDays}"></label>
       <button type="button" data-a="lookReset">Default colours</button><button class="primary">Save settings</button>
-      <p class="muted full">The background has to be dark, because the screens are made for dark rooms.</p><p class="err full" id="st-err" hidden></p></form>`);
+      <p class="muted full">The background has to be dark, because the screens are made for dark rooms.</p><p class="err full" id="st-err" hidden></p></form>
+    <p class="muted" style="margin-top:26px">ShowPace ${esc(m.data?.version || '')} · <a href="https://github.com/darrenhughes87/ShowPace/releases" target="_blank" rel="noopener">Check for a newer version</a></p>`);
   const fail = (id, x) => { const e = $(id); e.hidden = false; e.textContent = x instanceof TypeError ? 'ShowPace cannot reach the server.' : x.message; };
   $('#u-form').onsubmit = async e => {
     e.preventDefault();
@@ -790,7 +791,6 @@ async function viewAdmin() {
   };
 }
 function viewMissing(msg) {
-
   document.body.dataset.view = 'missing';
   $('#top').innerHTML = `<a class="logo" href="#"><span>${appName()}</span></a>`;
   $('#app').innerHTML = `<div class="shows wrap"><div class="empty">${esc(msg)}</div></div>`;
@@ -834,7 +834,8 @@ async function viewShows() {
     $('#app').innerHTML = `<section class="shows wrap">
       <div class="shows-head"><h1>Shows</h1>
         <label class="muted"><input type="checkbox" id="arch"${showArchived ? ' checked' : ''}> Show archived</label>
-        <button data-a="crewPage" title="One link for all crew: lists every show you have pushed live">Copy crew page link</button>
+        <button data-a="connect" title="Open ShowPace on a phone, tablet or another computer">Open on another device</button>
+        <button data-a="crewPage" title="One link for all crew: lists every show you have pushed live">Crew page</button>
         <a class="btn" href="/template.csv" download="ShowPace running order template.csv" title="The columns ShowPace reads, with example rows">Download template</a>
         <button data-a="importFile" title="A running order as CSV or Excel (.xlsx) becomes a new show">Upload running order</button><button class="primary" data-a="newShow">New show</button></div>
       <form class="form" id="new" hidden>
@@ -842,14 +843,14 @@ async function viewShows() {
         <label>Date<input id="n-date" type="date" value="${today()}" required></label>
         <label>Start<input id="n-start" type="time" value="09:00" required></label>
         <button class="primary">Create show</button></form>
-      <input type="file" id="file" accept=".csv,.tsv,.txt,.xlsx,.xlsm,.numbers,.json" hidden>
+      <input type="file" id="file" accept=".csv,.tsv,.txt,.xlsx,.xlsm,.numbers" hidden>
       <div class="list">${rows.length ? rows.map(s => `
         <article class="show-row${s.date === today() ? ' today' : ''}${s.archived ? ' arch' : ''}">
           <div class="d">${fmtDate(s.date)}<small>${s.date === today() ? 'Today · ' : ''}${esc(s.start)}</small></div>
           <div><h2><a href="#s/${s.id}">${esc(s.title || 'Untitled show')}</a></h2>
             <div class="meta2">${s.segments} segments · ${fmtDur(s.runtime)}${s.live ? ' · <span class="chip under">Live now</span>' : ''}${s.onCrew && !s.archived ? ` · <span class="chip k-talk">On crew page${s.crewLocked ? ', password' : ''}</span>` : ''}${s.archived ? ' · Archived' : ''}</div></div>
           <div class="acts"><a class="btn" href="#s/${s.id}">Edit</a><a class="btn primary" href="#s/${s.id}/call">Call</a>
-            <button data-a="copyLink" data-token="${esc(s.viewToken)}">Crew link</button>
+            <button data-a="crewLink" data-token="${esc(s.viewToken)}" data-title="${esc(s.title)}">Crew link</button>
             <button data-a="archive" data-id="${s.id}">${s.archived ? 'Restore' : 'Archive'}</button>${s.archived ? `<button data-a="deleteShow" data-id="${s.id}" data-title="${esc(s.title)}">Delete</button>` : ''}</div>
         </article>`).join('') : `<div class="empty">No shows yet. Press New show to build your first running order.</div>`}</div></section>`;
     $('#arch').onchange = e => { showArchived = e.target.checked; draw(); };
@@ -863,15 +864,9 @@ async function viewShows() {
     $('#file').onchange = async e => {
       const f = e.target.files[0]; e.target.value = '';
       if (!f) return;
-      try {
-        let r;
-        if (/\.json$/i.test(f.name)) {  // an older export
-          const s = JSON.parse(await f.text());
-          r = await api('/api/shows', {method:'POST', body:JSON.stringify({...s, live:{id:null, at:null, log:[]}})});
-        } else {  // CSV or Excel: the server reads it and builds the show
-          const data = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result.split(',')[1]); fr.onerror = no; fr.readAsDataURL(f); });
-          r = await api('/api/import', {method:'POST', body:JSON.stringify({name:f.name, data})});
-        }
+      try {  // CSV or Excel: the server reads it and builds the show
+        const data = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result.split(',')[1]); fr.onerror = no; fr.readAsDataURL(f); });
+        const r = await api('/api/import', {method:'POST', body:JSON.stringify({name:f.name, data})});
         if (!r.ok) throw Error(r.data?.error);
         toast('Show created. Check the date, name and timings.');
         location.hash = `#s/${r.data.id}`;
@@ -999,21 +994,9 @@ function viewTimer() {
 
 // The phone remote: the show's crew link plus the remote password. The same controls as Call; the live state goes to the server.
 function viewRemote() {
-  const key = store.get('rkey.' + R.token), st = state(), i = liveIdx(), nx = show.items[st === 'live' ? nextIdx(i) : nextIdx(-1)];
+  const st = state(), i = liveIdx(), nx = show.items[st === 'live' ? nextIdx(i) : nextIdx(-1)];
   $('#top').innerHTML = `<div class="show-name"><b>${esc(show.title || 'Untitled show')}</b><small>Caller remote</small></div><div class="right"><span class="sync" data-t="sync"></span></div>`;
   syncChip();
-  if (!key) {
-    $('#app').innerHTML = `<section class="remote wrap"><form id="r-login"><h1 style="font:400 26px/1.2 var(--display);margin:0">Caller remote</h1>
-      <p class="muted" style="margin:0">Type the remote password the show caller gave you.</p>
-      <input type="password" id="r-pass" class="f" placeholder="Remote password" autocomplete="off" required><button class="primary" style="min-height:52px">Unlock</button><p class="err" id="r-err" hidden></p></form></section>`;
-    $('#r-login').onsubmit = async e => {
-      e.preventDefault();
-      const r = await api(`/api/remote/${R.token}`, {method:'POST', body:JSON.stringify({pass:$('#r-pass').value})}).catch(() => null);
-      if (r?.ok) { store.set('rkey.' + R.token, r.data.key); return render(); }
-      const err = $('#r-err'); err.hidden = false; err.textContent = r?.data?.error || 'ShowPace cannot reach the server.';
-    };
-    return;
-  }
   $('#app').innerHTML = `<section class="remote wrap">${timerCard(false)}
     <div class="r-next"><div class="lab">${st === 'ready' ? 'Up first' : 'Next'}${nx ? ` · <span data-exp="${idx(nx.id)}"></span>` : ''}</div>${nx ? esc(nx.title || 'Untitled') : 'End of show'}</div>
     ${callControls()}${timeTravel()}${holdPanel()}<button class="msg-btn" data-a="message">Message the speaker</button>${statsHtml()}</section>`;
@@ -1034,6 +1017,7 @@ function followLive() {
 }
 function render() {
   if (!show) return;
+  if (R.view === 'remote' && !remoteKey()) return viewOff({locked:true, title:show.title});  // the remote asks for its password first
   const view = document.body.dataset.view, y = scrollY;
   const kept = SCROLLERS.map(s => { const el = $(s); return el && [el.scrollTop, el.scrollLeft]; });
   document.body.dataset.view = R.view;
@@ -1123,10 +1107,10 @@ const ACT = {
   lookReset() { $('#st-brand').value = '#1f8f4e'; $('#st-bg').value = '#101211'; toast('Press Save settings to keep these'); },
   newShow() { const f = $('#new'); f.hidden = !f.hidden; if (!f.hidden) $('#n-title').focus(); },
   importFile() { $('#file').click(); },
-  async crewPage() {
-    const url = `${location.origin}/crew`;
-    try { await navigator.clipboard.writeText(url); toast('Crew page link copied'); } catch { prompt('Crew page: send this to the crew', url); }
-  },
+  connect() { qrModal('Open on another device', '/', 'Scan with a phone or tablet camera, then log in.'); },
+  crewPage() { qrModal('Crew page', '/crew', 'One link for all your crew. It lists every show you have pushed live.'); },
+  crewLink(b) { qrModal('Crew link', `/v/${b.dataset.token || show.viewToken}`, "Crew scan this to follow the show. Until you push the show live, it says the show isn't open yet.", b.dataset.title || show?.title); },
+  clockLink() { qrModal('Speaker clock', `/v/${show.viewToken}#timer`, "Open this on the stage screen. Until you push the show live, it says the show isn't open yet.", show.title); },
   async pushLive() {  // always asks for a crew password; empty means straight in
     let body;
     if (show.onCrew) {
@@ -1157,23 +1141,12 @@ const ACT = {
     toast(r?.ok ? 'Show deleted' : r?.data?.error || 'Could not reach the server');
     viewShows();
   },
-  async remote() {  // show the QR for the phone remote, setting a remote password first if there isn't one
-    if (!show.remoteOn && !(await setRemotePass())) return;
-    if (!window.qrcode) await new Promise((ok, no) => document.head.append(Object.assign(document.createElement('script'), {src:'/qrcode.min.js', onload:ok, onerror:no})));
-    const url = `${location.origin}/r/${show.viewToken}`, qr = qrcode(0, 'M');
-    qr.addData(url); qr.make();
-    document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="qr-modal"><div class="modal-card"><div class="lab">Caller remote</div><h2>${esc(show.title || 'Untitled show')}</h2>
-      <div class="qr">${qr.createSvgTag({cellSize:6, margin:2, scalable:true})}</div>
-      <p>Scan with the phone camera, then type the remote password.</p><code>${esc(url)}</code>
-      <div class="row"><button data-a="copyRemote" data-url="${esc(url)}">Copy link</button><button class="primary" data-a="closeQr">Done</button></div></div></div>`);
+  async remote() {  // the QR for the phone remote, setting a remote password first if there isn't one
+    if (show.remoteOn || await setRemotePass()) qrModal('Caller remote', `/r/${show.viewToken}`, 'Scan with the phone camera, then type the remote password.', show.title);
   },
   async remotePass() { if (await setRemotePass()) toast('New remote password set. Phones using the old one are locked out.'); },
   closeQr() { $('#qr-modal')?.remove(); },
-  async copyRemote(b) { try { await navigator.clipboard.writeText(b.dataset.url); toast('Remote link copied'); } catch { prompt('Caller remote link', b.dataset.url); } },
-  async copyLink(b) {
-    const url = `${location.origin}/v/${b.dataset.token || show.viewToken}`;
-    try { await navigator.clipboard.writeText(url); toast('Crew link copied'); } catch { prompt('Crew link: send this to the crew', url); }
-  },
+  async copy(b) { try { await navigator.clipboard.writeText(b.dataset.url); toast('Link copied'); } catch { prompt('Copy this link', b.dataset.url); } },
   mode(b) { simple = b.dataset.v === '1'; store.set('simple', simple); render(); },
   start() { const l = show.live; l.id = show.items[nextIdx(-1)].id; l.at = nowMs(); l.log = []; fresh(l); save(); render(); },
   complete() {
@@ -1263,6 +1236,19 @@ const ACT = {
     } catch {}
   },
 };
+// A link for another device, with its QR code. 'localhost' only works on this computer, so links use its network address instead.
+async function qrModal(lab, path, note, title = '') {
+  if (!window.qrcode) await new Promise((ok, no) => document.head.append(Object.assign(document.createElement('script'), {src:'/qrcode.min.js', onload:ok, onerror:no})));
+  const local = ['localhost', '127.0.0.1'].includes(location.hostname), lan = (await api('/api/me').catch(() => null))?.data?.lan;
+  const url = (local && lan ? lan : location.origin) + path, qr = qrcode(0, 'M');
+  qr.addData(url); qr.make();
+  $('#qr-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="qr-modal"><div class="modal-card"><div class="lab">${lab}</div>${title ? `<h2>${esc(title)}</h2>` : ''}
+    <div class="qr">${qr.createSvgTag({cellSize:6, margin:2, scalable:true})}</div><p>${note}</p>
+    ${local && !lan ? '<p class="err">This computer is not on a network yet, so other devices cannot reach it. Join the Wi-Fi, then open this again.</p>' : lan ? '<p>The device has to be on the same Wi-Fi as this computer.</p>' : ''}
+    <code>${esc(url)}</code>
+    <div class="row"><button data-a="copy" data-url="${esc(url)}">Copy link</button><button class="primary" data-a="closeQr">Done</button></div></div></div>`);
+}
 async function setRemotePass() {  // a remote password of its own, separate from crew passwords and logins
   const pw = prompt('Caller remote password.\n\nAnyone with this and the QR can press Start, Complete and Back from a phone. A new password locks out phones using the old one.', '');
   if (!pw) { if (pw === '' && show.remoteOn && confirm('Switch the caller remote off?')) await sendRemote(''); return false; }
@@ -1334,6 +1320,7 @@ let lock = null;
 async function wake() {
   try {
     const want = ['call', 'crew', 'timer', 'remote'].includes(R.view) && show && document.visibilityState === 'visible';
+    if (want && !navigator.wakeLock && !store.get('sleepNote')) { store.set('sleepNote', 1); toast('This screen can go to sleep. Set its Auto-Lock to Never for the show.'); }
     if (want && !lock) { lock = await navigator.wakeLock?.request('screen'); lock?.addEventListener('release', () => lock = null); }
     if (!want && lock) { lock.release(); lock = null; }
   } catch {}

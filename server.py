@@ -10,6 +10,7 @@ people with a login edit and call shows; crew get a view-only link per show (/v/
   python3 server.py deluser NAME    remove a login
 
 The first time you open it in a browser, it asks you to create the admin login.
+app.py wraps this as a double-click app (ShowPace.app and ShowPace.exe).
 """
 import sys
 
@@ -19,8 +20,21 @@ import base64, csv, datetime, functools, getpass, hashlib, hmac, html, io, json,
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
+VERSION = '1.0.0'
 DIR = os.path.dirname(os.path.abspath(__file__))
-DATA = os.environ.get('SHOWPACE_DATA', os.path.join(DIR, 'data'))
+
+
+def data_home():
+    """Run from the folder, shows live in ./data. The packaged app keeps them in the user's own app-data folder,
+    so replacing the app with a newer one never touches them."""
+    if not getattr(sys, 'frozen', False):
+        return os.path.join(DIR, 'data')
+    base = os.environ.get('APPDATA') if os.name == 'nt' else os.path.expanduser(
+        '~/Library/Application Support' if sys.platform == 'darwin' else '~/.local/share')
+    return os.path.join(base, 'ShowPace')
+
+
+DATA = os.environ.get('SHOWPACE_DATA') or data_home()
 SHOWS = os.path.join(DATA, 'shows')
 PORT = int(os.environ.get('SHOWPACE_PORT', 4320))
 SECURE = os.environ.get('SHOWPACE_SECURE') == '1'  # set behind HTTPS so the login cookie is Secure
@@ -404,6 +418,7 @@ def crew_list():
 
 class Handler(SimpleHTTPRequestHandler):
     server_version, sys_version = 'ShowPace', ''  # don't tell the world which Python this runs on
+    timeout = 60  # a phone that walks out of Wi-Fi mid-request is dropped, so it can't hold a thread or stay in the Watching count
 
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=DIR, **kw)
@@ -516,8 +531,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, crew_list())
         if path == '/api/me':  # who is logged in; with nobody set up yet, the page shows the first-run screen
             u = self.user()
-            if u:
-                return self.send_json(200, {'user': u, 'admin': bool(users()[u].get('admin'))})
+            if u:  # lan: the address other devices on the same network use, for links and QR codes
+                ip = None if PROXY else lan_address()
+                return self.send_json(200, {'user': u, 'admin': bool(users()[u].get('admin')), 'version': VERSION,
+                                            'lan': ip and f'http://{ip}:{self.server.server_address[1]}'})
             return self.send_json(401, {'error': 'Log in', 'setup': not users()})
         m = re.fullmatch(r'/api/view/([A-Za-z0-9_-]+)', path)
         if m:
@@ -556,6 +573,8 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             data = self.body()
         except Exception:
+            data = None
+        if not isinstance(data, dict) or not path.startswith('/api/'):
             return self.send_json(400, {'error': 'Bad request'})
         sess_path = os.path.join(DATA, 'sessions.json')
         who = self.ip() + ' ' + path.split('/')[2]  # wrong passwords count per address and per kind: login, crew, remote
@@ -790,7 +809,7 @@ class Handler(SimpleHTTPRequestHandler):
                 seen = now
                 self.wfile.write(b'data: %s\n\n' % msg if msg else b': ping\n\n')
                 self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+        except OSError:  # the device went away (Windows and Macs report it differently)
             pass
         finally:
             with lock:
@@ -821,9 +840,20 @@ def lan_address():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(('10.255.255.255', 1))  # nothing is sent; this just picks the network card
-            return s.getsockname()[0]
+            ip = s.getsockname()[0]
+            return None if ip.startswith('127.') else ip
     except OSError:
         return None
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = os.name != 'nt'  # on Windows this would let a second copy share the port, and scramble the shows
+    request_queue_size = 64  # a room full of phones reconnecting at once
+
+    def handle_error(self, request, client_address):
+        if not isinstance(sys.exc_info()[1], OSError):  # a device dropping off the Wi-Fi is not worth a traceback
+            super().handle_error(request, client_address)
 
 
 if __name__ == '__main__':
@@ -837,17 +867,16 @@ if __name__ == '__main__':
         sys.exit(__doc__)
     load()
     try:
-        srv = ThreadingHTTPServer(('0.0.0.0', PORT), Handler)
+        srv = Server(('0.0.0.0', PORT), Handler)
     except OSError:
         sys.exit(f'Port {PORT} is already in use. Is ShowPace already running in another window?\n'
                  f'To use another port:  python3 server.py --port {PORT + 1}')
-    srv.daemon_threads = True
     if PROXY:  # in Docker behind Caddy: people use the web address, not this port
         print('ShowPace is running behind Caddy. Open your web address in a browser.', flush=True)
     else:
         lan = lan_address()
         print(f'\nShowPace is running.\n  On this computer:  http://localhost:{PORT}')
-        if lan and not lan.startswith('127.'):
+        if lan:
             print(f'  On other devices:  http://{lan}:{PORT}   (same Wi-Fi)')
         if not users():
             print('  First time? Open it in your browser and create the admin login.')

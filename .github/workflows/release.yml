@@ -1,0 +1,63 @@
+# Builds ShowPace.app (Mac) and ShowPace.exe (Windows) and adds them to the release.
+# Runs when a version tag like v1.0.0 is pushed.
+name: Build the apps
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test the server
+        run: python test_server.py
+      - name: Build the app
+        run: |
+          pip install pyinstaller pillow
+          args="--noconfirm --windowed --name ShowPace --icon icon.png --add-data index.html:. --add-data template.csv:. --add-data qrcode.min.js:."
+          if [ "$RUNNER_OS" = Windows ]; then
+            pyinstaller $args --onefile app.py
+          else  # one app for Apple silicon and Intel Macs if this machine can build it, otherwise just its own kind
+            pyinstaller $args --osx-bundle-identifier app.showpace --target-arch universal2 app.py \
+              || pyinstaller $args --osx-bundle-identifier app.showpace app.py
+          fi
+      - name: Check the built app starts, answers, and won't run twice
+        env:
+          BROWSER: 'true'  # don't open a browser on the build machine
+        run: |
+          app=dist/ShowPace.exe
+          [ "$RUNNER_OS" = Windows ] || app=dist/ShowPace.app/Contents/MacOS/ShowPace
+          "$app" & first=$!
+          for i in $(seq 1 60); do curl -fs http://localhost:4320/api/time > /dev/null && break; sleep 1; done
+          curl -fs http://localhost:4320/ | grep -q '<title>ShowPace</title>'
+          curl -fs http://localhost:4320/qrcode.min.js > /dev/null
+          "$app" & second=$!
+          sleep 15
+          if kill -0 $second 2> /dev/null; then echo 'A second copy stayed open'; exit 1; fi
+          kill $first || true
+      - name: Package it
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp dist/ShowPace.exe ShowPace-Windows.exe
+          else
+            lipo -archs dist/ShowPace.app/Contents/MacOS/ShowPace
+            ditto -c -k --keepParent dist/ShowPace.app ShowPace-Mac.zip
+          fi
+      - name: Add it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "ShowPace ${GITHUB_REF_NAME#v}" --generate-notes 2> /dev/null || true  # already there is fine
+          gh release upload "$GITHUB_REF_NAME" ShowPace-* --clobber
