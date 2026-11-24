@@ -20,7 +20,7 @@ import base64, csv, datetime, functools, getpass, hashlib, hmac, html, io, json,
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -47,6 +47,7 @@ MIN_PASS = 10
 TEXT = ('cue', 'title', 'who', 'kind', 'audio', 'lx', 'vid', 'notes', 'until')
 MAX_FAILS, FAIL_WINDOW = 10, 900   # wrong passwords per address per 15 minutes, then locked out
 COOKIE = 'showpace'
+STAGE = None     # the app's second screen: a key made by app.py each time it starts. With no key there is no stage screen
 MAX_VIEWERS = 300                    # live connections per show
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
        "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
@@ -397,6 +398,17 @@ def crew_state(s):
     return 'ended' if s.get('archived') or live.get('id') or live.get('log') else 'notyet'  # started at some point: it has finished
 
 
+def is_stage(token):
+    return bool(STAGE) and hmac.compare_digest(STAGE, token)
+
+
+def stage_show():
+    """The app's second screen follows the show that moved last: a Start, Complete, Go or adhoc timer. None when nothing is running."""
+    when = lambda s: max(s['live'].get('at') or 0, (s['live'].get('hold') or {}).get('at') or 0)
+    going = [s for s in shows.values() if not s.get('archived') and (s['live'].get('hold') or s['live'].get('id') not in (None, 'END'))]
+    return max(going, key=when, default=None)
+
+
 def crew_pass(sid):
     return read_json(os.path.join(DATA, 'crewpass.json'), {}).get(sid)
 
@@ -516,7 +528,7 @@ class Handler(SimpleHTTPRequestHandler):
     # ---- routes
     def do_GET(self):
         path = self.path.split('?')[0]
-        if path in ('/', '/crew') or path.startswith(('/v/', '/r/')):
+        if path in ('/', '/crew') or path.startswith(('/v/', '/r/')):  # the stage screen is a /v/ link too, with the app's key
             self.path = '/index.html'
             return super().do_GET()
         if path in STATIC:
@@ -538,6 +550,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(401, {'error': 'Log in', 'setup': not users()})
         m = re.fullmatch(r'/api/view/([A-Za-z0-9_-]+)', path)
         if m:
+            if is_stage(m.group(1)):  # this computer's own second screen: no push live or crew password needed
+                s = stage_show()
+                return self.send_json(200, s) if s else self.send_json(403, {'off': 'stage', 'title': ''})
             s = self.by_token(m.group(1))
             if not s:
                 return self.send_json(404, {'error': 'This crew link is not valid'})
@@ -548,8 +563,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, s)
         m = re.fullmatch(r'/api/events/(v/)?([A-Za-z0-9_-]+)', path)
         if m:
-            s = self.by_token(m.group(2)) if m.group(1) else (self.user() and shows.get(m.group(2)))
-            return self.events(s['id'], crew=bool(m.group(1))) if s else self.send_json(404, {'error': 'Not found'})
+            stage = bool(m.group(1)) and is_stage(m.group(2))
+            s = stage_show() if stage else self.by_token(m.group(2)) if m.group(1) else (self.user() and shows.get(m.group(2)))
+            return self.events(s['id'], crew=bool(m.group(1)) and not stage, stage=stage) if s else self.send_json(404, {'error': 'Not found'})
         if not self.user():
             return self.send_json(401, {'error': 'Log in'})
         if path in ('/api/users', '/api/settings'):
@@ -780,7 +796,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_json(200, {})
 
     # Server-sent events: the show on connect, then every change, plus how many devices are watching.
-    def events(self, sid, crew=False):
+    def events(self, sid, crew=False, stage=False):
         if viewers.get(sid, 0) >= MAX_VIEWERS:
             return self.send_json(503, {'error': 'Too many devices are watching this show'})
         self.send_response(200)
@@ -795,10 +811,13 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             while True:
                 with lock:
-                    lock.wait_for(lambda: sid not in shows or (version[sid], viewers[sid]) != seen, timeout=15)
-                    if sid not in shows:  # deleted: crew screens say it has finished
-                        if crew:
-                            self.wfile.write(b'data: {"off":"ended","title":""}\n\n')
+                    # gone: deleted, or the stage screen's show has ended or another has started. The screen lets go and asks again
+                    gone = lambda: sid not in shows or stage and stage_show() is not shows[sid]
+                    lock.wait_for(lambda: gone() or (version[sid], viewers[sid]) != seen, timeout=15)
+                    if gone():
+                        if crew or stage:
+                            # retry: the stage screen asks again in half a second, so swapping shows is quick
+                            self.wfile.write(b'retry: 500\ndata: {"off":"%s","title":""}\n\n' % (b'stage' if stage else b'ended'))
                         break
                     now, s = (version[sid], viewers[sid]), shows[sid]
                     st = crew_state(s) if crew else 'open'  # not on the crew page, or no current password key: never the show

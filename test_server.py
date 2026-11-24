@@ -253,6 +253,29 @@ for _ in range(5):
 assert m['show']['id'] == sid_, 'pushed live again: the open screen rejoins by itself'
 stream.close()
 
+# The app's second screen: with the app's key it gets the show that moved last, pushed live or not. Without a key there is none.
+assert call('/api/view/stage-key')[0] == 404, 'no key, no stage screen'
+server.STAGE = 'stage-key'
+for s in server.shows.values():
+    s['live'] = server.clean_live({})  # nothing running
+assert call('/api/view/stage-key')[::2] == (403, {'off': 'stage', 'title': ''}) and call('/api/events/v/stage-key')[0] == 404, 'nothing running: it waits'
+call(f'/api/shows/{sid_}/crew', 'POST', {'on': False}, cookie)
+run = call(f'/api/shows/{sid_}', cookie=cookie)[2]
+run['live'] = {'id': first, 'at': 5000}
+call(f'/api/shows/{sid_}', 'PUT', run, cookie)
+assert call('/api/view/stage-key')[2]['id'] == sid_ and call(f'/api/view/{tok}')[0] == 403, 'the stage screen needs no push live; the crew link still does'
+stream = urllib.request.urlopen(base + '/api/events/v/stage-key', timeout=5)
+assert next_msg()['show']['id'] == sid_
+run['live'] = {'id': 'END'}
+call(f'/api/shows/{sid_}', 'PUT', run, cookie)
+for _ in range(5):
+    m = next_msg()
+    if 'off' in m:
+        break
+assert m['off'] == 'stage', 'the show ends: the screen lets go and waits for the next one'
+stream.close()
+server.STAGE = None
+
 # Deleting: only archived shows, only staff, and the file is kept in data/deleted
 gone = x['id']
 assert call(f'/api/shows/{gone}', 'DELETE')[0] == 401, 'staff only'

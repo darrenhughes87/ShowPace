@@ -50,10 +50,21 @@ The apps aren't signed with Apple or Microsoft (that costs money every year), so
 A small window that says **ShowPace is running**, and ShowPace opens in your browser. The first time, it asks you to make an admin login. That's you.
 
 - **Keep the window open during the show.** Closing it stops ShowPace.
-- **It keeps your computer awake** while it's open. Keep the lid open and the charger in.
+- **It keeps your computer and its screens awake** while it's open. Keep the lid open and the charger in.
+- **Clock on second screen** puts the speaker's clock full screen on a second display. See [A stage screen plugged into your computer](#a-stage-screen-plugged-into-your-computer).
 - **Show my files** opens the folder where your shows are saved. Copy that folder to back them up.
 - **Forgot your password?** Press **Show my files**, delete `users.json`, then quit and reopen ShowPace. It asks you to make a new login. Your shows are kept.
 - **A newer version?** Download it and replace the old app. Your shows and logins stay where they are.
+
+### A stage screen plugged into your computer
+
+Got a TV, monitor or projector plugged into the computer that runs ShowPace? Tick **Clock on second screen** in the ShowPace window. That screen fills with the clock. No dragging windows about.
+
+- **It follows the show by itself.** Press **Start show** and the countdown appears. You don't need a link, and you don't need to push the show live.
+- **Before the show,** and after it ends, it shows a plain holding screen.
+- **Untick the box** to clear the screen.
+- **It needs Chrome or Edge.** Windows already has Edge. On a Mac, install Chrome or Edge first. Safari can't do this.
+- **Set the second screen to extend, not mirror.** On a Mac: System Settings, Displays. On Windows: press the Windows key and P, then pick **Extend**.
 
 ---
 
@@ -76,8 +87,8 @@ ShowPace runs on your computer, and every other screen connects to it over the n
 **3. Stop screens going to sleep.**
 
 - **On a stage iPad:** Settings, Display & Brightness, Auto-Lock, **Never**. Plug it in.
-- **For a full-screen clock:** in Safari, press Share, then **Add to Home Screen**, and open it from there.
-- **On the laptop:** the app keeps it awake. Keep the lid open and the charger in.
+- **For a full-screen clock on an iPad:** in Safari, press Share, then **Add to Home Screen**, and open it from there.
+- **On the laptop:** the app keeps it awake, and any screen plugged into it. Keep the lid open and the charger in.
 
 **4. Do a test before doors.** Start the show, check the clock on stage moves, press Back. If a screen says it's offline, it has dropped off the Wi-Fi: it reconnects by itself when it's back.
 

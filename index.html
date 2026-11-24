@@ -502,7 +502,8 @@ function viewOff(m) {
   if ($('#app .off')?.dataset.state === state) return;  // already showing it: don't wipe a password being typed
   document.body.dataset.view = 'off'; document.body.classList.remove('t-over', 't-warn');  // calm black, whatever state it ended in
   $('#top').innerHTML = '';
-  const [h, sub] = {ended:['This show has finished', 'Thanks for following.'],
+  const [h, sub] = {stage:[appName(), 'The clock starts when the show does.'],  // the app's second screen, with nothing running
+    ended:['This show has finished', 'Thanks for following.'],
     notyet:["This show isn't open yet", 'This page opens by itself when the show goes live.'],
     locked:['This show needs a password', remote ? 'Type the remote password the show caller gave you.' : 'Ask the show caller for the crew password.']}[state];
   $('#app').innerHTML = `<section class="tv off" data-state="${state}"><div></div><div class="tv-mid">
@@ -985,7 +986,7 @@ function viewTimer() {
   const back = R.token ? '#crew' : `#s/${show.id}/call`;
   $('#top').innerHTML = '';
   $('#app').innerHTML = `<section class="tv">
-    <div class="tv-top"><span data-t="clock"></span><span class="ctl">${document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen ? `<button data-a="fullscreen" data-t="fs">${isFull() ? 'Exit full screen' : 'Full screen'}</button>` : ''}<a class="btn" href="${back}">Back</a></span></div>
+    <div class="tv-top"><span data-t="clock"></span><span class="ctl"${location.search === '?stage' ? ' hidden' : ''}>${document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen ? `<button data-a="fullscreen" data-t="fs">${isFull() ? 'Exit full screen' : 'Full screen'}</button>` : ''}<a class="btn" href="${back}">Back</a></span></div>
     <div class="tv-mid"><div class="tv-title">${msg ? title : `<span>${title}</span>`}</div>
       <div class="count" data-t="count">${hold ? fmtDur(hold.dur) : counts ? fmtDur(show.items[i].dur) : hms(nowMs())}</div><div class="prog"${counts ? '' : ' style="visibility:hidden"'}><i data-t="prog"></i></div></div>
     <div class="tv-next">${nx ? 'Next: ' + esc(nx.title) : ''}</div><div></div>
