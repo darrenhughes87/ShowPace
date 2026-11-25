@@ -20,7 +20,7 @@ import base64, csv, datetime, functools, getpass, hashlib, hmac, html, io, json,
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 DIR = os.path.dirname(os.path.abspath(__file__))
 
 
